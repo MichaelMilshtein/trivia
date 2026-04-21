@@ -7,7 +7,7 @@ Simple React + Vite sandbox for learning and experimenting with a trivia app.
 - React + Vite setup
 - React Router with pages:
   - Home
-  - Categories
+  - Categories (loads active categories from Supabase)
   - Game
   - Admin
 - Simple navigation
@@ -20,12 +20,16 @@ Simple React + Vite sandbox for learning and experimenting with a trivia app.
 ## Not included yet
 
 - Trivia questions/data
-- Supabase
 - Authentication
 
 ## Run locally
 
+1. Install dependencies.
+2. Copy `.env.example` to `.env`.
+3. Start the app.
+
 ```bash
 npm install
+cp .env.example .env
 npm run dev
 ```
