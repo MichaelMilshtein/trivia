@@ -33,3 +33,25 @@ export async function selectFrom(table, { columns = '*', filters = {} } = {}) {
 
   return response.json()
 }
+
+export async function insertInto(table, values) {
+  const { supabaseUrl: url, supabasePublishableKey: key } = getSupabaseConfig()
+
+  const response = await fetch(`${url}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation'
+    },
+    body: JSON.stringify(values)
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    throw new Error(`Supabase request failed (${response.status}): ${errorBody}`)
+  }
+
+  return response.json()
+}
