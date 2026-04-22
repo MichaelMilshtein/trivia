@@ -11,6 +11,14 @@ function AdminPage() {
   const [submitMessage, setSubmitMessage] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [questionsJson, setQuestionsJson] = useState('')
+  const [importMessage, setImportMessage] = useState('')
+  const [importError, setImportError] = useState('')
+  const [isImporting, setIsImporting] = useState(false)
+  const [categoryQuestions, setCategoryQuestions] = useState([])
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
+  const [questionsError, setQuestionsError] = useState('')
 
   async function loadCategories() {
     setError('')
@@ -36,6 +44,37 @@ function AdminPage() {
     initializeCategories()
   }, [])
 
+  useEffect(() => {
+    async function loadQuestionsForCategory() {
+      if (!selectedCategoryId) {
+        setCategoryQuestions([])
+        setQuestionsError('')
+        return
+      }
+
+      setIsLoadingQuestions(true)
+      setQuestionsError('')
+
+      try {
+        const rows = await selectFrom('questions', {
+          columns:
+            'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active',
+          filters: {
+            category_id: `eq.${selectedCategoryId}`
+          }
+        })
+
+        setCategoryQuestions(rows)
+      } catch (err) {
+        setQuestionsError(err instanceof Error ? err.message : 'Failed to load questions.')
+      } finally {
+        setIsLoadingQuestions(false)
+      }
+    }
+
+    loadQuestionsForCategory()
+  }, [selectedCategoryId])
+
   async function handleCreateCategory(event) {
     event.preventDefault()
     setSubmitMessage('')
@@ -58,6 +97,93 @@ function AdminPage() {
       setSubmitError(err instanceof Error ? err.message : 'Failed to create category.')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  async function handleImportQuestions(event) {
+    event.preventDefault()
+    setImportMessage('')
+    setImportError('')
+
+    if (!selectedCategoryId) {
+      setImportError('Please choose a category before importing questions.')
+      return
+    }
+
+    setIsImporting(true)
+
+    try {
+      const parsed = JSON.parse(questionsJson)
+      const sourceQuestions = parsed?.questions
+
+      if (!Array.isArray(sourceQuestions) || sourceQuestions.length === 0) {
+        throw new Error('JSON must include a non-empty "questions" array.')
+      }
+
+      const validationErrors = []
+      const questionRows = sourceQuestions.map((question, index) => {
+        const questionNumber = index + 1
+        const questionText =
+          typeof question.question_text === 'string' ? question.question_text.trim() : ''
+        const choices = Array.isArray(question.choices) ? question.choices : []
+        const correctIndex = question.correct_index
+
+        if (!questionText) {
+          validationErrors.push(`Question ${questionNumber}: "question_text" is required.`)
+        }
+
+        if (choices.length !== 4) {
+          validationErrors.push(`Question ${questionNumber}: "choices" must have exactly 4 items.`)
+        }
+
+        if (
+          !Number.isInteger(correctIndex) ||
+          correctIndex < 0 ||
+          correctIndex > 3
+        ) {
+          validationErrors.push(
+            `Question ${questionNumber}: "correct_index" must be an integer from 0 to 3.`
+          )
+        }
+
+        return {
+          category_id: selectedCategoryId,
+          question_text: questionText,
+          choice_a: typeof choices[0] === 'string' ? choices[0] : '',
+          choice_b: typeof choices[1] === 'string' ? choices[1] : '',
+          choice_c: typeof choices[2] === 'string' ? choices[2] : '',
+          choice_d: typeof choices[3] === 'string' ? choices[3] : '',
+          correct_index: correctIndex,
+          difficulty: question.difficulty ?? null,
+          is_active: question.is_active ?? true
+        }
+      })
+
+      if (validationErrors.length > 0) {
+        throw new Error(validationErrors.join(' '))
+      }
+
+      await insertInto('questions', questionRows)
+
+      setImportMessage(`Imported ${questionRows.length} question(s) successfully.`)
+      setQuestionsJson('')
+
+      const rows = await selectFrom('questions', {
+        columns:
+          'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active',
+        filters: {
+          category_id: `eq.${selectedCategoryId}`
+        }
+      })
+      setCategoryQuestions(rows)
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        setImportError('Invalid JSON. Please paste valid JSON and try again.')
+      } else {
+        setImportError(err instanceof Error ? err.message : 'Failed to import questions.')
+      }
+    } finally {
+      setIsImporting(false)
     }
   }
 
@@ -119,6 +245,82 @@ function AdminPage() {
           </ul>
         ) : (
           <p>No categories found.</p>
+        )
+      ) : null}
+
+      <h3>Admin Questions Import</h3>
+      <form onSubmit={handleImportQuestions}>
+        <label htmlFor="question-category">Category</label>
+        <select
+          id="question-category"
+          name="category_id"
+          value={selectedCategoryId}
+          onChange={(event) => setSelectedCategoryId(event.target.value)}
+          required
+        >
+          <option value="">Choose a category</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+
+        <label htmlFor="questions-json">Questions JSON</label>
+        <textarea
+          id="questions-json"
+          name="questions_json"
+          rows={16}
+          value={questionsJson}
+          onChange={(event) => setQuestionsJson(event.target.value)}
+          placeholder={`{
+  "questions": [
+    {
+      "question_text": "...",
+      "choices": ["A", "B", "C", "D"],
+      "correct_index": 0,
+      "difficulty": "medium",
+      "is_active": true
+    }
+  ]
+}`}
+          required
+        />
+
+        <button type="submit" disabled={isImporting}>
+          {isImporting ? 'Importing...' : 'Import questions'}
+        </button>
+      </form>
+
+      {importMessage ? <p>{importMessage}</p> : null}
+      {importError ? <p>{importError}</p> : null}
+
+      <h3>Category Questions (Read Only)</h3>
+      {!selectedCategoryId ? <p>Select a category to view questions.</p> : null}
+      {isLoadingQuestions ? <p>Loading questions...</p> : null}
+      {questionsError ? <p>{questionsError}</p> : null}
+
+      {selectedCategoryId && !isLoadingQuestions && !questionsError ? (
+        categoryQuestions.length > 0 ? (
+          <ul>
+            {categoryQuestions.map((question) => (
+              <li key={question.id}>
+                <p>
+                  <strong>{question.question_text}</strong>
+                </p>
+                <p>
+                  A: {question.choice_a} | B: {question.choice_b} | C: {question.choice_c} | D:{' '}
+                  {question.choice_d}
+                </p>
+                <p>
+                  Correct index: {question.correct_index} | Difficulty:{' '}
+                  {question.difficulty || 'unknown'} | Active: {question.is_active ? 'Yes' : 'No'}
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No questions found for this category.</p>
         )
       ) : null}
     </section>
