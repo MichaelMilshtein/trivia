@@ -47,6 +47,9 @@ function AdminPage() {
   const [isUpdatingQuestion, setIsUpdatingQuestion] = useState(false)
   const [questionUpdateMessage, setQuestionUpdateMessage] = useState('')
   const [questionUpdateError, setQuestionUpdateError] = useState('')
+  const [isTogglingQuestionActive, setIsTogglingQuestionActive] = useState(false)
+  const [questionActiveMessage, setQuestionActiveMessage] = useState('')
+  const [questionActiveError, setQuestionActiveError] = useState('')
 
   const sourceTitlesById = useMemo(
     () =>
@@ -355,6 +358,33 @@ function AdminPage() {
       setSourceSubmitError(err instanceof Error ? err.message : 'Failed to create source.')
     } finally {
       setIsSubmittingSource(false)
+    }
+  }
+
+  async function handleToggleQuestionActive(question) {
+    setQuestionActiveMessage('')
+    setQuestionActiveError('')
+    setIsTogglingQuestionActive(true)
+
+    try {
+      await updateRows(
+        'questions',
+        {
+          is_active: !question.is_active
+        },
+        { id: `eq.${question.id}` }
+      )
+
+      setQuestionActiveMessage(
+        question.is_active ? 'Question deactivated successfully.' : 'Question reactivated successfully.'
+      )
+      await refreshCategoryQuestions(selectedCategoryId)
+    } catch (err) {
+      setQuestionActiveError(
+        err instanceof Error ? err.message : 'Failed to update question active status.'
+      )
+    } finally {
+      setIsTogglingQuestionActive(false)
     }
   }
 
@@ -691,6 +721,8 @@ function AdminPage() {
       {!selectedCategoryId ? <p>Select a category to view questions.</p> : null}
       {isLoadingQuestions ? <p>Loading questions...</p> : null}
       {questionsError ? <p>{questionsError}</p> : null}
+      {questionActiveMessage ? <p>{questionActiveMessage}</p> : null}
+      {questionActiveError ? <p>{questionActiveError}</p> : null}
 
       {selectedCategoryId && !isLoadingQuestions && !questionsError ? (
         categoryQuestions.length > 0 ? (
@@ -714,6 +746,13 @@ function AdminPage() {
                 {question.section ? <p>Section: {question.section}</p> : null}
                 <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
                   Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleQuestionActive(question)}
+                  disabled={isTogglingQuestionActive}
+                >
+                  {question.is_active ? 'Deactivate' : 'Reactivate'}
                 </button>
               </li>
             ))}
