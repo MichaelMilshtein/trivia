@@ -22,6 +22,7 @@ function AdminPage() {
   const [isSubmittingSource, setIsSubmittingSource] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [selectedSourceId, setSelectedSourceId] = useState('')
+  const [batchSection, setBatchSection] = useState('')
   const [questionsJson, setQuestionsJson] = useState('')
   const [importMessage, setImportMessage] = useState('')
   const [importError, setImportError] = useState('')
@@ -88,7 +89,7 @@ function AdminPage() {
       try {
         const rows = await selectFrom('questions', {
           columns:
-            'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active,source_id',
+            'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active,source_id,section',
           filters: {
             category_id: `eq.${selectedCategoryId}`
           }
@@ -157,6 +158,9 @@ function AdminPage() {
           typeof question.question_text === 'string' ? question.question_text.trim() : ''
         const choices = Array.isArray(question.choices) ? question.choices : []
         const correctIndex = question.correct_index
+        const questionSection =
+          typeof question.section === 'string' ? question.section.trim() : ''
+        const resolvedSection = questionSection || batchSection.trim()
 
         if (!questionText) {
           validationErrors.push(`Question ${questionNumber}: "question_text" is required.`)
@@ -186,7 +190,8 @@ function AdminPage() {
           correct_index: correctIndex,
           difficulty: question.difficulty ?? null,
           is_active: question.is_active ?? true,
-          source_id: selectedSourceId || null
+          source_id: selectedSourceId || null,
+          section: resolvedSection || null
         }
       })
 
@@ -198,10 +203,11 @@ function AdminPage() {
 
       setImportMessage(`Imported ${questionRows.length} question(s) successfully.`)
       setQuestionsJson('')
+      setBatchSection('')
 
       const rows = await selectFrom('questions', {
         columns:
-          'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active,source_id',
+          'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active,source_id,section',
         filters: {
           category_id: `eq.${selectedCategoryId}`
         }
@@ -422,6 +428,16 @@ function AdminPage() {
           ))}
         </select>
 
+        <label htmlFor="question-batch-section">Batch section (optional)</label>
+        <input
+          id="question-batch-section"
+          name="batch_section"
+          type="text"
+          value={batchSection}
+          onChange={(event) => setBatchSection(event.target.value)}
+          placeholder="Used when a question does not include section"
+        />
+
         <label htmlFor="questions-json">Questions JSON</label>
         <textarea
           id="questions-json"
@@ -435,6 +451,7 @@ function AdminPage() {
       "question_text": "...",
       "choices": ["A", "B", "C", "D"],
       "correct_index": 0,
+      "section": "Round 1",
       "difficulty": "medium",
       "is_active": true
     }
@@ -476,6 +493,7 @@ function AdminPage() {
                   Source:{' '}
                   {sourceTitlesById[question.source_id] || 'No source'}
                 </p>
+                {question.section ? <p>Section: {question.section}</p> : null}
               </li>
             ))}
           </ul>
