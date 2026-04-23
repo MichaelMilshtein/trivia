@@ -12,6 +12,14 @@ function AdminPage() {
   const [submitMessage, setSubmitMessage] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [sourceTitle, setSourceTitle] = useState('')
+  const [sourceType, setSourceType] = useState('')
+  const [sourceSection, setSourceSection] = useState('')
+  const [sourceUrl, setSourceUrl] = useState('')
+  const [sourceIsActive, setSourceIsActive] = useState(true)
+  const [sourceSubmitMessage, setSourceSubmitMessage] = useState('')
+  const [sourceSubmitError, setSourceSubmitError] = useState('')
+  const [isSubmittingSource, setIsSubmittingSource] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [selectedSourceId, setSelectedSourceId] = useState('')
   const [questionsJson, setQuestionsJson] = useState('')
@@ -42,7 +50,7 @@ function AdminPage() {
 
   async function loadSources() {
     const rows = await selectFrom('sources', {
-      columns: 'id,title'
+      columns: 'id,title,source_type,section,url,is_active'
     })
 
     setSources(rows)
@@ -210,6 +218,35 @@ function AdminPage() {
     }
   }
 
+  async function handleCreateSource(event) {
+    event.preventDefault()
+    setSourceSubmitMessage('')
+    setSourceSubmitError('')
+    setIsSubmittingSource(true)
+
+    try {
+      await insertInto('sources', {
+        title: sourceTitle.trim(),
+        source_type: sourceType.trim(),
+        section: sourceSection.trim(),
+        url: sourceUrl.trim(),
+        is_active: sourceIsActive
+      })
+
+      setSourceSubmitMessage('Source created successfully.')
+      setSourceTitle('')
+      setSourceType('')
+      setSourceSection('')
+      setSourceUrl('')
+      setSourceIsActive(true)
+      await loadSources()
+    } catch (err) {
+      setSourceSubmitError(err instanceof Error ? err.message : 'Failed to create source.')
+    } finally {
+      setIsSubmittingSource(false)
+    }
+  }
+
   return (
     <section>
       <h2>Admin</h2>
@@ -268,6 +305,87 @@ function AdminPage() {
           </ul>
         ) : (
           <p>No categories found.</p>
+        )
+      ) : null}
+
+      <h3>Create Source</h3>
+      <form onSubmit={handleCreateSource}>
+        <label htmlFor="source-title">Title</label>
+        <input
+          id="source-title"
+          name="title"
+          type="text"
+          value={sourceTitle}
+          onChange={(event) => setSourceTitle(event.target.value)}
+          required
+        />
+
+        <label htmlFor="source-type">Source type</label>
+        <input
+          id="source-type"
+          name="source_type"
+          type="text"
+          value={sourceType}
+          onChange={(event) => setSourceType(event.target.value)}
+          required
+        />
+
+        <label htmlFor="source-section">Section</label>
+        <input
+          id="source-section"
+          name="section"
+          type="text"
+          value={sourceSection}
+          onChange={(event) => setSourceSection(event.target.value)}
+          required
+        />
+
+        <label htmlFor="source-url">URL</label>
+        <input
+          id="source-url"
+          name="url"
+          type="url"
+          value={sourceUrl}
+          onChange={(event) => setSourceUrl(event.target.value)}
+          required
+        />
+
+        <label htmlFor="source-active">Is active</label>
+        <input
+          id="source-active"
+          name="is_active"
+          type="checkbox"
+          checked={sourceIsActive}
+          onChange={(event) => setSourceIsActive(event.target.checked)}
+        />
+
+        <button type="submit" disabled={isSubmittingSource}>
+          {isSubmittingSource ? 'Creating...' : 'Create source'}
+        </button>
+      </form>
+
+      {sourceSubmitMessage ? <p>{sourceSubmitMessage}</p> : null}
+      {sourceSubmitError ? <p>{sourceSubmitError}</p> : null}
+
+      <h3>Admin Sources (Read Only)</h3>
+      {isLoading ? <p>Loading sources...</p> : null}
+      {!isLoading && !error ? (
+        sources.length > 0 ? (
+          <ul>
+            {sources.map((source) => (
+              <li key={source.id}>
+                <p>
+                  <strong>{source.title}</strong>
+                </p>
+                <p>Source type: {source.source_type || 'N/A'}</p>
+                <p>Section: {source.section || 'N/A'}</p>
+                <p>URL: {source.url || 'N/A'}</p>
+                <p>Active: {source.is_active ? 'Yes' : 'No'}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No sources found.</p>
         )
       ) : null}
 
