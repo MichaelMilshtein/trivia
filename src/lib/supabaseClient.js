@@ -55,3 +55,32 @@ export async function insertInto(table, values) {
 
   return response.json()
 }
+
+
+export async function updateRows(table, values, filters = {}) {
+  const { supabaseUrl: url, supabasePublishableKey: key } = getSupabaseConfig()
+
+  const queryParams = new URLSearchParams()
+
+  for (const [field, value] of Object.entries(filters)) {
+    queryParams.set(field, value)
+  }
+
+  const response = await fetch(`${url}/rest/v1/${table}?${queryParams.toString()}`, {
+    method: 'PATCH',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation'
+    },
+    body: JSON.stringify(values)
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    throw new Error(`Supabase request failed (${response.status}): ${errorBody}`)
+  }
+
+  return response.json()
+}

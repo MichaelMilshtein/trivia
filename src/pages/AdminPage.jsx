@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { insertInto, selectFrom } from '../lib/supabaseClient'
+import { insertInto, selectFrom, updateRows } from '../lib/supabaseClient'
+
+const QUESTION_COLUMNS =
+  'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active,source_id,section'
 
 function AdminPage() {
   const [categories, setCategories] = useState([])
@@ -30,6 +33,21 @@ function AdminPage() {
   const [categoryQuestions, setCategoryQuestions] = useState([])
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   const [questionsError, setQuestionsError] = useState('')
+  const [editingQuestionId, setEditingQuestionId] = useState('')
+  const [editQuestionText, setEditQuestionText] = useState('')
+  const [editChoiceA, setEditChoiceA] = useState('')
+  const [editChoiceB, setEditChoiceB] = useState('')
+  const [editChoiceC, setEditChoiceC] = useState('')
+  const [editChoiceD, setEditChoiceD] = useState('')
+  const [editCorrectIndex, setEditCorrectIndex] = useState('0')
+  const [editDifficulty, setEditDifficulty] = useState('')
+  const [editIsActive, setEditIsActive] = useState(true)
+  const [editSection, setEditSection] = useState('')
+  const [editSourceId, setEditSourceId] = useState('')
+  const [isUpdatingQuestion, setIsUpdatingQuestion] = useState(false)
+  const [questionUpdateMessage, setQuestionUpdateMessage] = useState('')
+  const [questionUpdateError, setQuestionUpdateError] = useState('')
+
   const sourceTitlesById = useMemo(
     () =>
       sources.reduce((accumulator, source) => {
@@ -57,6 +75,55 @@ function AdminPage() {
     setSources(rows)
   }
 
+  async function fetchCategoryQuestions(categoryId) {
+    return selectFrom('questions', {
+      columns: QUESTION_COLUMNS,
+      filters: {
+        category_id: `eq.${categoryId}`
+      }
+    })
+  }
+
+  async function refreshCategoryQuestions(categoryId = selectedCategoryId) {
+    if (!categoryId) {
+      setCategoryQuestions([])
+      return
+    }
+
+    const rows = await fetchCategoryQuestions(categoryId)
+    setCategoryQuestions(rows)
+  }
+
+  function resetQuestionEditForm() {
+    setEditingQuestionId('')
+    setEditQuestionText('')
+    setEditChoiceA('')
+    setEditChoiceB('')
+    setEditChoiceC('')
+    setEditChoiceD('')
+    setEditCorrectIndex('0')
+    setEditDifficulty('')
+    setEditIsActive(true)
+    setEditSection('')
+    setEditSourceId('')
+  }
+
+  function loadQuestionIntoEditForm(question) {
+    setEditingQuestionId(question.id)
+    setEditQuestionText(question.question_text || '')
+    setEditChoiceA(question.choice_a || '')
+    setEditChoiceB(question.choice_b || '')
+    setEditChoiceC(question.choice_c || '')
+    setEditChoiceD(question.choice_d || '')
+    setEditCorrectIndex(String(question.correct_index ?? 0))
+    setEditDifficulty(question.difficulty || '')
+    setEditIsActive(Boolean(question.is_active))
+    setEditSection(question.section || '')
+    setEditSourceId(question.source_id || '')
+    setQuestionUpdateMessage('')
+    setQuestionUpdateError('')
+  }
+
   useEffect(() => {
     async function initializeCategories() {
       try {
@@ -80,6 +147,7 @@ function AdminPage() {
       if (!selectedCategoryId) {
         setCategoryQuestions([])
         setQuestionsError('')
+        resetQuestionEditForm()
         return
       }
 
@@ -87,14 +155,7 @@ function AdminPage() {
       setQuestionsError('')
 
       try {
-        const rows = await selectFrom('questions', {
-          columns:
-            'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active,source_id,section',
-          filters: {
-            category_id: `eq.${selectedCategoryId}`
-          }
-        })
-
+        const rows = await fetchCategoryQuestions(selectedCategoryId)
         setCategoryQuestions(rows)
       } catch (err) {
         setQuestionsError(err instanceof Error ? err.message : 'Failed to load questions.')
@@ -205,14 +266,7 @@ function AdminPage() {
       setQuestionsJson('')
       setBatchSection('')
 
-      const rows = await selectFrom('questions', {
-        columns:
-          'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active,source_id,section',
-        filters: {
-          category_id: `eq.${selectedCategoryId}`
-        }
-      })
-      setCategoryQuestions(rows)
+      await refreshCategoryQuestions(selectedCategoryId)
     } catch (err) {
       if (err instanceof SyntaxError) {
         setImportError('Invalid JSON. Please paste valid JSON and try again.')
@@ -221,6 +275,57 @@ function AdminPage() {
       }
     } finally {
       setIsImporting(false)
+    }
+  }
+
+  async function handleUpdateQuestion(event) {
+    event.preventDefault()
+    setQuestionUpdateMessage('')
+    setQuestionUpdateError('')
+
+    if (!editingQuestionId) {
+      setQuestionUpdateError('Select a question to edit first.')
+      return
+    }
+
+    const parsedCorrectIndex = Number(editCorrectIndex)
+
+    if (!Number.isInteger(parsedCorrectIndex) || parsedCorrectIndex < 0 || parsedCorrectIndex > 3) {
+      setQuestionUpdateError('Correct index must be an integer from 0 to 3.')
+      return
+    }
+
+    if (!editQuestionText.trim()) {
+      setQuestionUpdateError('Question text is required.')
+      return
+    }
+
+    setIsUpdatingQuestion(true)
+
+    try {
+      await updateRows(
+        'questions',
+        {
+          question_text: editQuestionText.trim(),
+          choice_a: editChoiceA.trim(),
+          choice_b: editChoiceB.trim(),
+          choice_c: editChoiceC.trim(),
+          choice_d: editChoiceD.trim(),
+          correct_index: parsedCorrectIndex,
+          difficulty: editDifficulty.trim() || null,
+          is_active: editIsActive,
+          section: editSection.trim() || null,
+          source_id: editSourceId || null
+        },
+        { id: `eq.${editingQuestionId}` }
+      )
+
+      setQuestionUpdateMessage('Question updated successfully.')
+      await refreshCategoryQuestions(selectedCategoryId)
+    } catch (err) {
+      setQuestionUpdateError(err instanceof Error ? err.message : 'Failed to update question.')
+    } finally {
+      setIsUpdatingQuestion(false)
     }
   }
 
@@ -468,6 +573,120 @@ function AdminPage() {
       {importMessage ? <p>{importMessage}</p> : null}
       {importError ? <p>{importError}</p> : null}
 
+      <h3>Question Editor</h3>
+      {!editingQuestionId ? <p>Click Edit on a question to load it into this form.</p> : null}
+      <form onSubmit={handleUpdateQuestion}>
+        <label htmlFor="edit-question-text">Question text</label>
+        <textarea
+          id="edit-question-text"
+          name="question_text"
+          value={editQuestionText}
+          onChange={(event) => setEditQuestionText(event.target.value)}
+          required
+        />
+
+        <label htmlFor="edit-choice-a">Choice A</label>
+        <input
+          id="edit-choice-a"
+          name="choice_a"
+          type="text"
+          value={editChoiceA}
+          onChange={(event) => setEditChoiceA(event.target.value)}
+          required
+        />
+
+        <label htmlFor="edit-choice-b">Choice B</label>
+        <input
+          id="edit-choice-b"
+          name="choice_b"
+          type="text"
+          value={editChoiceB}
+          onChange={(event) => setEditChoiceB(event.target.value)}
+          required
+        />
+
+        <label htmlFor="edit-choice-c">Choice C</label>
+        <input
+          id="edit-choice-c"
+          name="choice_c"
+          type="text"
+          value={editChoiceC}
+          onChange={(event) => setEditChoiceC(event.target.value)}
+          required
+        />
+
+        <label htmlFor="edit-choice-d">Choice D</label>
+        <input
+          id="edit-choice-d"
+          name="choice_d"
+          type="text"
+          value={editChoiceD}
+          onChange={(event) => setEditChoiceD(event.target.value)}
+          required
+        />
+
+        <label htmlFor="edit-correct-index">Correct index</label>
+        <input
+          id="edit-correct-index"
+          name="correct_index"
+          type="number"
+          min={0}
+          max={3}
+          value={editCorrectIndex}
+          onChange={(event) => setEditCorrectIndex(event.target.value)}
+          required
+        />
+
+        <label htmlFor="edit-difficulty">Difficulty</label>
+        <input
+          id="edit-difficulty"
+          name="difficulty"
+          type="text"
+          value={editDifficulty}
+          onChange={(event) => setEditDifficulty(event.target.value)}
+        />
+
+        <label htmlFor="edit-active">Is active</label>
+        <input
+          id="edit-active"
+          name="is_active"
+          type="checkbox"
+          checked={editIsActive}
+          onChange={(event) => setEditIsActive(event.target.checked)}
+        />
+
+        <label htmlFor="edit-section">Section</label>
+        <input
+          id="edit-section"
+          name="section"
+          type="text"
+          value={editSection}
+          onChange={(event) => setEditSection(event.target.value)}
+        />
+
+        <label htmlFor="edit-source">Source</label>
+        <select
+          id="edit-source"
+          name="source_id"
+          value={editSourceId}
+          onChange={(event) => setEditSourceId(event.target.value)}
+        >
+          <option value="">No source</option>
+          {sources.map((source) => (
+            <option key={source.id} value={source.id}>
+              {source.title}
+            </option>
+          ))}
+        </select>
+
+        <button type="submit" disabled={!editingQuestionId || isUpdatingQuestion}>
+          {isUpdatingQuestion ? 'Saving...' : 'Save question changes'}
+        </button>
+      </form>
+
+      {questionUpdateMessage ? <p>{questionUpdateMessage}</p> : null}
+      {questionUpdateError ? <p>{questionUpdateError}</p> : null}
+
       <h3>Category Questions (Read Only)</h3>
       {!selectedCategoryId ? <p>Select a category to view questions.</p> : null}
       {isLoadingQuestions ? <p>Loading questions...</p> : null}
@@ -490,10 +709,12 @@ function AdminPage() {
                   {question.difficulty || 'unknown'} | Active: {question.is_active ? 'Yes' : 'No'}
                 </p>
                 <p>
-                  Source:{' '}
-                  {sourceTitlesById[question.source_id] || 'No source'}
+                  Source: {sourceTitlesById[question.source_id] || 'No source'}
                 </p>
                 {question.section ? <p>Section: {question.section}</p> : null}
+                <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
+                  Edit
+                </button>
               </li>
             ))}
           </ul>
