@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { insertInto, selectFrom } from '../lib/supabaseClient'
 
 function AdminPage() {
   const [categories, setCategories] = useState([])
+  const [sources, setSources] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [name, setName] = useState('')
@@ -12,6 +13,7 @@ function AdminPage() {
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [selectedSourceId, setSelectedSourceId] = useState('')
   const [questionsJson, setQuestionsJson] = useState('')
   const [importMessage, setImportMessage] = useState('')
   const [importError, setImportError] = useState('')
@@ -19,6 +21,14 @@ function AdminPage() {
   const [categoryQuestions, setCategoryQuestions] = useState([])
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   const [questionsError, setQuestionsError] = useState('')
+  const sourceTitlesById = useMemo(
+    () =>
+      sources.reduce((accumulator, source) => {
+        accumulator[source.id] = source.title
+        return accumulator
+      }, {}),
+    [sources]
+  )
 
   async function loadCategories() {
     setError('')
@@ -30,12 +40,24 @@ function AdminPage() {
     setCategories(rows)
   }
 
+  async function loadSources() {
+    const rows = await selectFrom('sources', {
+      columns: 'id,title'
+    })
+
+    setSources(rows)
+  }
+
   useEffect(() => {
     async function initializeCategories() {
       try {
-        await loadCategories()
+        await Promise.all([loadCategories(), loadSources()])
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load categories.')
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to load categories and sources.'
+        )
       } finally {
         setIsLoading(false)
       }
@@ -58,7 +80,7 @@ function AdminPage() {
       try {
         const rows = await selectFrom('questions', {
           columns:
-            'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active',
+            'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active,source_id',
           filters: {
             category_id: `eq.${selectedCategoryId}`
           }
@@ -155,7 +177,8 @@ function AdminPage() {
           choice_d: typeof choices[3] === 'string' ? choices[3] : '',
           correct_index: correctIndex,
           difficulty: question.difficulty ?? null,
-          is_active: question.is_active ?? true
+          is_active: question.is_active ?? true,
+          source_id: selectedSourceId || null
         }
       })
 
@@ -170,7 +193,7 @@ function AdminPage() {
 
       const rows = await selectFrom('questions', {
         columns:
-          'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active',
+          'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active,source_id',
         filters: {
           category_id: `eq.${selectedCategoryId}`
         }
@@ -266,6 +289,21 @@ function AdminPage() {
           ))}
         </select>
 
+        <label htmlFor="question-source">Source (optional)</label>
+        <select
+          id="question-source"
+          name="source_id"
+          value={selectedSourceId}
+          onChange={(event) => setSelectedSourceId(event.target.value)}
+        >
+          <option value="">No source</option>
+          {sources.map((source) => (
+            <option key={source.id} value={source.id}>
+              {source.title}
+            </option>
+          ))}
+        </select>
+
         <label htmlFor="questions-json">Questions JSON</label>
         <textarea
           id="questions-json"
@@ -315,6 +353,10 @@ function AdminPage() {
                 <p>
                   Correct index: {question.correct_index} | Difficulty:{' '}
                   {question.difficulty || 'unknown'} | Active: {question.is_active ? 'Yes' : 'No'}
+                </p>
+                <p>
+                  Source:{' '}
+                  {sourceTitlesById[question.source_id] || 'No source'}
                 </p>
               </li>
             ))}
