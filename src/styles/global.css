@@ -85,45 +85,30 @@ body {
   margin-bottom: 1rem;
 }
 
-.admin-question-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.admin-question-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
 }
 
-.admin-question-row {
+.admin-question-table th,
+.admin-question-table td {
   border: 1px solid #e2e8f0;
-  border-radius: 0.5rem;
-  padding: 0.65rem 0.75rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.75rem;
+  padding: 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-question-table th {
   background: #f8fafc;
 }
 
-.admin-question-main {
-  min-width: 0;
-}
-
-.admin-question-text {
-  margin: 0 0 0.35rem;
-  font-weight: 600;
-}
-
-.admin-question-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
-  color: #334155;
-  font-size: 0.9rem;
+.admin-question-cell-preview {
+  max-width: 320px;
 }
 
 .admin-question-actions {
   display: flex;
   gap: 0.4rem;
-  flex-shrink: 0;
+  flex-wrap: wrap;
 }
