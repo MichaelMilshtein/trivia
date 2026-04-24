@@ -33,6 +33,10 @@ function AdminPage() {
   const [categoryQuestions, setCategoryQuestions] = useState([])
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   const [questionsError, setQuestionsError] = useState('')
+  const [listCategoryId, setListCategoryId] = useState('')
+  const [listSourceIdFilter, setListSourceIdFilter] = useState('all')
+  const [listActiveFilter, setListActiveFilter] = useState('all')
+  const [listSectionSearch, setListSectionSearch] = useState('')
   const [editingQuestionId, setEditingQuestionId] = useState('')
   const [editQuestionText, setEditQuestionText] = useState('')
   const [editChoiceA, setEditChoiceA] = useState('')
@@ -59,6 +63,29 @@ function AdminPage() {
       }, {}),
     [sources]
   )
+
+  const filteredCategoryQuestions = useMemo(() => {
+    const normalizedSectionSearch = listSectionSearch.trim().toLowerCase()
+
+    return categoryQuestions.filter((question) => {
+      const sourceMatches =
+        listSourceIdFilter === 'all' ? true : String(question.source_id || '') === listSourceIdFilter
+
+      const activeMatches =
+        listActiveFilter === 'all'
+          ? true
+          : listActiveFilter === 'active'
+            ? Boolean(question.is_active)
+            : !question.is_active
+
+      const sectionText = (question.section || '').toLowerCase()
+      const sectionMatches = normalizedSectionSearch
+        ? sectionText.includes(normalizedSectionSearch)
+        : true
+
+      return sourceMatches && activeMatches && sectionMatches
+    })
+  }, [categoryQuestions, listSourceIdFilter, listActiveFilter, listSectionSearch])
 
   async function loadCategories() {
     setError('')
@@ -87,7 +114,7 @@ function AdminPage() {
     })
   }
 
-  async function refreshCategoryQuestions(categoryId = selectedCategoryId) {
+  async function refreshCategoryQuestions(categoryId = listCategoryId) {
     if (!categoryId) {
       setCategoryQuestions([])
       return
@@ -147,7 +174,7 @@ function AdminPage() {
 
   useEffect(() => {
     async function loadQuestionsForCategory() {
-      if (!selectedCategoryId) {
+      if (!listCategoryId) {
         setCategoryQuestions([])
         setQuestionsError('')
         resetQuestionEditForm()
@@ -158,7 +185,7 @@ function AdminPage() {
       setQuestionsError('')
 
       try {
-        const rows = await fetchCategoryQuestions(selectedCategoryId)
+        const rows = await fetchCategoryQuestions(listCategoryId)
         setCategoryQuestions(rows)
       } catch (err) {
         setQuestionsError(err instanceof Error ? err.message : 'Failed to load questions.')
@@ -168,7 +195,7 @@ function AdminPage() {
     }
 
     loadQuestionsForCategory()
-  }, [selectedCategoryId])
+  }, [listCategoryId])
 
   async function handleCreateCategory(event) {
     event.preventDefault()
@@ -269,7 +296,7 @@ function AdminPage() {
       setQuestionsJson('')
       setBatchSection('')
 
-      await refreshCategoryQuestions(selectedCategoryId)
+      await refreshCategoryQuestions(listCategoryId)
     } catch (err) {
       if (err instanceof SyntaxError) {
         setImportError('Invalid JSON. Please paste valid JSON and try again.')
@@ -324,7 +351,7 @@ function AdminPage() {
       )
 
       setQuestionUpdateMessage('Question updated successfully.')
-      await refreshCategoryQuestions(selectedCategoryId)
+      await refreshCategoryQuestions(listCategoryId)
     } catch (err) {
       setQuestionUpdateError(err instanceof Error ? err.message : 'Failed to update question.')
     } finally {
@@ -378,7 +405,7 @@ function AdminPage() {
       setQuestionActiveMessage(
         question.is_active ? 'Question deactivated successfully.' : 'Question reactivated successfully.'
       )
-      await refreshCategoryQuestions(selectedCategoryId)
+      await refreshCategoryQuestions(listCategoryId)
     } catch (err) {
       setQuestionActiveError(
         err instanceof Error ? err.message : 'Failed to update question active status.'
@@ -722,16 +749,71 @@ function AdminPage() {
 
       <section className="admin-section">
         <h3>Questions List</h3>
-        {!selectedCategoryId ? <p>Select a category to view questions.</p> : null}
+        <div className="admin-filters">
+          <label htmlFor="list-category-filter">Category</label>
+          <select
+            id="list-category-filter"
+            name="list_category_filter"
+            value={listCategoryId}
+            onChange={(event) => setListCategoryId(event.target.value)}
+          >
+            <option value="">Choose a category</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="list-source-filter">Source</label>
+          <select
+            id="list-source-filter"
+            name="list_source_filter"
+            value={listSourceIdFilter}
+            onChange={(event) => setListSourceIdFilter(event.target.value)}
+          >
+            <option value="all">All sources</option>
+            <option value="">No source</option>
+            {sources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.title}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="list-active-filter">Active status</label>
+          <select
+            id="list-active-filter"
+            name="list_active_filter"
+            value={listActiveFilter}
+            onChange={(event) => setListActiveFilter(event.target.value)}
+          >
+            <option value="all">All</option>
+            <option value="active">Active only</option>
+            <option value="inactive">Inactive only</option>
+          </select>
+
+          <label htmlFor="list-section-search">Section search</label>
+          <input
+            id="list-section-search"
+            name="list_section_search"
+            type="text"
+            value={listSectionSearch}
+            onChange={(event) => setListSectionSearch(event.target.value)}
+            placeholder="Search section text"
+          />
+        </div>
+
+        {!listCategoryId ? <p>Select a category to view questions.</p> : null}
         {isLoadingQuestions ? <p>Loading questions...</p> : null}
         {questionsError ? <p>{questionsError}</p> : null}
         {questionActiveMessage ? <p>{questionActiveMessage}</p> : null}
         {questionActiveError ? <p>{questionActiveError}</p> : null}
 
-        {selectedCategoryId && !isLoadingQuestions && !questionsError ? (
-          categoryQuestions.length > 0 ? (
+        {listCategoryId && !isLoadingQuestions && !questionsError ? (
+          filteredCategoryQuestions.length > 0 ? (
             <ul>
-              {categoryQuestions.map((question) => (
+              {filteredCategoryQuestions.map((question) => (
                 <li key={question.id}>
                   <p>
                     <strong>{question.question_text}</strong>
@@ -762,7 +844,7 @@ function AdminPage() {
               ))}
             </ul>
           ) : (
-            <p>No questions found for this category.</p>
+            <p>No questions found for the current filters.</p>
           )
         ) : null}
       </section>
