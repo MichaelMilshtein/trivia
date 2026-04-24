@@ -15,6 +15,13 @@ function AdminPage() {
   const [submitMessage, setSubmitMessage] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [editingCategoryId, setEditingCategoryId] = useState('')
+  const [editCategoryName, setEditCategoryName] = useState('')
+  const [editCategoryDescription, setEditCategoryDescription] = useState('')
+  const [editCategoryIsActive, setEditCategoryIsActive] = useState(true)
+  const [categoryUpdateMessage, setCategoryUpdateMessage] = useState('')
+  const [categoryUpdateError, setCategoryUpdateError] = useState('')
+  const [isUpdatingCategory, setIsUpdatingCategory] = useState(false)
   const [sourceTitle, setSourceTitle] = useState('')
   const [sourceType, setSourceType] = useState('')
   const [sourceSection, setSourceSection] = useState('')
@@ -174,6 +181,15 @@ function AdminPage() {
     setSourceUpdateError('')
   }
 
+  function loadCategoryIntoEditForm(category) {
+    setEditingCategoryId(category.id)
+    setEditCategoryName(category.name || '')
+    setEditCategoryDescription(category.description || '')
+    setEditCategoryIsActive(Boolean(category.is_active))
+    setCategoryUpdateMessage('')
+    setCategoryUpdateError('')
+  }
+
   useEffect(() => {
     async function initializeCategories() {
       try {
@@ -239,6 +255,43 @@ function AdminPage() {
       setSubmitError(err instanceof Error ? err.message : 'Failed to create category.')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  async function handleUpdateCategory(event) {
+    event.preventDefault()
+    setCategoryUpdateMessage('')
+    setCategoryUpdateError('')
+
+    if (!editingCategoryId) {
+      setCategoryUpdateError('Select a category to edit first.')
+      return
+    }
+
+    if (!editCategoryName.trim()) {
+      setCategoryUpdateError('Category name is required.')
+      return
+    }
+
+    setIsUpdatingCategory(true)
+
+    try {
+      await updateRows(
+        'categories',
+        {
+          name: editCategoryName.trim(),
+          description: editCategoryDescription.trim(),
+          is_active: editCategoryIsActive
+        },
+        { id: `eq.${editingCategoryId}` }
+      )
+
+      setCategoryUpdateMessage('Category updated successfully.')
+      await loadCategories()
+    } catch (err) {
+      setCategoryUpdateError(err instanceof Error ? err.message : 'Failed to update category.')
+    } finally {
+      setIsUpdatingCategory(false)
     }
   }
 
@@ -509,6 +562,8 @@ function AdminPage() {
 
         {submitMessage ? <p>{submitMessage}</p> : null}
         {submitError ? <p>{submitError}</p> : null}
+        {categoryUpdateMessage ? <p>{categoryUpdateMessage}</p> : null}
+        {categoryUpdateError ? <p>{categoryUpdateError}</p> : null}
         {isLoading ? <p>Loading categories...</p> : null}
         {error ? <p>{error}</p> : null}
 
@@ -520,6 +575,9 @@ function AdminPage() {
                   <h4>{category.name}</h4>
                   <p>{category.description || 'No description'}</p>
                   <p>Active: {category.is_active ? 'Yes' : 'No'}</p>
+                  <button type="button" onClick={() => loadCategoryIntoEditForm(category)}>
+                    Edit
+                  </button>
                 </li>
               ))}
             </ul>
@@ -527,6 +585,41 @@ function AdminPage() {
             <p>No categories found.</p>
           )
         ) : null}
+
+        <h4>Category Editor</h4>
+        {!editingCategoryId ? <p>Click Edit on a category to load it into this form.</p> : null}
+        <form onSubmit={handleUpdateCategory}>
+          <label htmlFor="edit-category-name">Name</label>
+          <input
+            id="edit-category-name"
+            name="edit_category_name"
+            type="text"
+            value={editCategoryName}
+            onChange={(event) => setEditCategoryName(event.target.value)}
+            required
+          />
+
+          <label htmlFor="edit-category-description">Description</label>
+          <textarea
+            id="edit-category-description"
+            name="edit_category_description"
+            value={editCategoryDescription}
+            onChange={(event) => setEditCategoryDescription(event.target.value)}
+          />
+
+          <label htmlFor="edit-category-active">Is active</label>
+          <input
+            id="edit-category-active"
+            name="edit_category_is_active"
+            type="checkbox"
+            checked={editCategoryIsActive}
+            onChange={(event) => setEditCategoryIsActive(event.target.checked)}
+          />
+
+          <button type="submit" disabled={!editingCategoryId || isUpdatingCategory}>
+            {isUpdatingCategory ? 'Saving...' : 'Save category changes'}
+          </button>
+        </form>
       </section>
 
       <section className="admin-section">
