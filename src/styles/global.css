@@ -103,6 +103,20 @@ body {
   background: #f8fafc;
 }
 
+.admin-sort-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+}
+
+.admin-sort-button:hover {
+  text-decoration: underline;
+}
+
 .admin-question-cell-preview {
   max-width: 320px;
 }
