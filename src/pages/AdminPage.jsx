@@ -23,6 +23,15 @@ function AdminPage() {
   const [sourceSubmitMessage, setSourceSubmitMessage] = useState('')
   const [sourceSubmitError, setSourceSubmitError] = useState('')
   const [isSubmittingSource, setIsSubmittingSource] = useState(false)
+  const [editingSourceId, setEditingSourceId] = useState('')
+  const [editSourceTitle, setEditSourceTitle] = useState('')
+  const [editSourceType, setEditSourceType] = useState('')
+  const [editSourceSection, setEditSourceSection] = useState('')
+  const [editSourceUrl, setEditSourceUrl] = useState('')
+  const [editSourceIsActive, setEditSourceIsActive] = useState(true)
+  const [sourceUpdateMessage, setSourceUpdateMessage] = useState('')
+  const [sourceUpdateError, setSourceUpdateError] = useState('')
+  const [isUpdatingSource, setIsUpdatingSource] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [selectedSourceId, setSelectedSourceId] = useState('')
   const [batchSection, setBatchSection] = useState('')
@@ -152,6 +161,17 @@ function AdminPage() {
     setEditSourceId(question.source_id || '')
     setQuestionUpdateMessage('')
     setQuestionUpdateError('')
+  }
+
+  function loadSourceIntoEditForm(source) {
+    setEditingSourceId(source.id)
+    setEditSourceTitle(source.title || '')
+    setEditSourceType(source.source_type || '')
+    setEditSourceSection(source.section || '')
+    setEditSourceUrl(source.url || '')
+    setEditSourceIsActive(Boolean(source.is_active))
+    setSourceUpdateMessage('')
+    setSourceUpdateError('')
   }
 
   useEffect(() => {
@@ -388,6 +408,40 @@ function AdminPage() {
     }
   }
 
+  async function handleUpdateSource(event) {
+    event.preventDefault()
+    setSourceUpdateMessage('')
+    setSourceUpdateError('')
+
+    if (!editingSourceId) {
+      setSourceUpdateError('Select a source to edit first.')
+      return
+    }
+
+    setIsUpdatingSource(true)
+
+    try {
+      await updateRows(
+        'sources',
+        {
+          title: editSourceTitle.trim(),
+          source_type: editSourceType.trim(),
+          section: editSourceSection.trim() || null,
+          url: editSourceUrl.trim() || null,
+          is_active: editSourceIsActive
+        },
+        { id: `eq.${editingSourceId}` }
+      )
+
+      setSourceUpdateMessage('Source updated successfully.')
+      await loadSources()
+    } catch (err) {
+      setSourceUpdateError(err instanceof Error ? err.message : 'Failed to update source.')
+    } finally {
+      setIsUpdatingSource(false)
+    }
+  }
+
   async function handleToggleQuestionActive(question) {
     setQuestionActiveMessage('')
     setQuestionActiveError('')
@@ -534,6 +588,8 @@ function AdminPage() {
 
         {sourceSubmitMessage ? <p>{sourceSubmitMessage}</p> : null}
         {sourceSubmitError ? <p>{sourceSubmitError}</p> : null}
+        {sourceUpdateMessage ? <p>{sourceUpdateMessage}</p> : null}
+        {sourceUpdateError ? <p>{sourceUpdateError}</p> : null}
         {isLoading ? <p>Loading sources...</p> : null}
         {!isLoading && !error ? (
           sources.length > 0 ? (
@@ -547,6 +603,9 @@ function AdminPage() {
                   <p>Section: {source.section || 'N/A'}</p>
                   <p>URL: {source.url || 'N/A'}</p>
                   <p>Active: {source.is_active ? 'Yes' : 'No'}</p>
+                  <button type="button" onClick={() => loadSourceIntoEditForm(source)}>
+                    Edit
+                  </button>
                 </li>
               ))}
             </ul>
@@ -554,6 +613,61 @@ function AdminPage() {
             <p>No sources found.</p>
           )
         ) : null}
+
+        <h4>Source Editor</h4>
+        {!editingSourceId ? <p>Click Edit on a source to load it into this form.</p> : null}
+        <form onSubmit={handleUpdateSource}>
+          <label htmlFor="edit-source-title">Title</label>
+          <input
+            id="edit-source-title"
+            name="edit_title"
+            type="text"
+            value={editSourceTitle}
+            onChange={(event) => setEditSourceTitle(event.target.value)}
+            required
+          />
+
+          <label htmlFor="edit-source-type">Source type</label>
+          <input
+            id="edit-source-type"
+            name="edit_source_type"
+            type="text"
+            value={editSourceType}
+            onChange={(event) => setEditSourceType(event.target.value)}
+            required
+          />
+
+          <label htmlFor="edit-source-section">Section</label>
+          <input
+            id="edit-source-section"
+            name="edit_section"
+            type="text"
+            value={editSourceSection}
+            onChange={(event) => setEditSourceSection(event.target.value)}
+          />
+
+          <label htmlFor="edit-source-url">URL</label>
+          <input
+            id="edit-source-url"
+            name="edit_url"
+            type="url"
+            value={editSourceUrl}
+            onChange={(event) => setEditSourceUrl(event.target.value)}
+          />
+
+          <label htmlFor="edit-source-active">Is active</label>
+          <input
+            id="edit-source-active"
+            name="edit_is_active"
+            type="checkbox"
+            checked={editSourceIsActive}
+            onChange={(event) => setEditSourceIsActive(event.target.checked)}
+          />
+
+          <button type="submit" disabled={!editingSourceId || isUpdatingSource}>
+            {isUpdatingSource ? 'Saving...' : 'Save source changes'}
+          </button>
+        </form>
       </section>
 
       <section className="admin-section">
