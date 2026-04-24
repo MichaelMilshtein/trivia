@@ -101,6 +101,30 @@ function AdminPage() {
     [categories]
   )
 
+  const sourcesByNormalizedTitle = useMemo(
+    () =>
+      sources.reduce((accumulator, source) => {
+        const normalizedTitle = (source.title || '').trim().toLowerCase()
+        if (normalizedTitle) {
+          accumulator[normalizedTitle] = source
+        }
+        return accumulator
+      }, {}),
+    [sources]
+  )
+
+  const categoriesByNormalizedName = useMemo(
+    () =>
+      categories.reduce((accumulator, category) => {
+        const normalizedName = (category.name || '').trim().toLowerCase()
+        if (normalizedName) {
+          accumulator[normalizedName] = category
+        }
+        return accumulator
+      }, {}),
+    [categories]
+  )
+
   const filteredCategoryQuestions = useMemo(() => {
     const normalizedSectionSearch = listSectionSearch.trim().toLowerCase()
 
@@ -411,19 +435,31 @@ function AdminPage() {
     setImportMessage('')
     setImportError('')
 
-    if (!selectedCategoryId) {
-      setImportError('Please choose a category before importing questions.')
-      return
-    }
-
     setIsImporting(true)
 
     try {
       const parsed = JSON.parse(questionsJson)
       const sourceQuestions = parsed?.questions
+      const jsonSourceTitle =
+        typeof parsed?.source_title === 'string' ? parsed.source_title.trim() : ''
+      const jsonBatchSection =
+        typeof parsed?.section === 'string' ? parsed.section.trim() : ''
+      const fallbackBatchSection = batchSection.trim()
+      const fallbackSourceId = selectedSourceId || null
+      const fallbackCategoryId = selectedCategoryId || null
 
       if (!Array.isArray(sourceQuestions) || sourceQuestions.length === 0) {
         throw new Error('JSON must include a non-empty "questions" array.')
+      }
+
+      let resolvedSourceId = fallbackSourceId
+
+      if (jsonSourceTitle) {
+        const matchedSource = sourcesByNormalizedTitle[jsonSourceTitle.toLowerCase()]
+        if (!matchedSource) {
+          throw new Error(`No source found with title "${jsonSourceTitle}".`)
+        }
+        resolvedSourceId = matchedSource.id
       }
 
       const validationErrors = []
@@ -435,7 +471,22 @@ function AdminPage() {
         const correctIndex = question.correct_index
         const questionSection =
           typeof question.section === 'string' ? question.section.trim() : ''
-        const resolvedSection = questionSection || batchSection.trim()
+        const resolvedSection = questionSection || jsonBatchSection || fallbackBatchSection
+        const questionCategoryName =
+          typeof question.category === 'string' ? question.category.trim() : ''
+
+        let resolvedCategoryId = fallbackCategoryId
+
+        if (questionCategoryName) {
+          const matchedCategory = categoriesByNormalizedName[questionCategoryName.toLowerCase()]
+          if (!matchedCategory) {
+            validationErrors.push(
+              `Question ${questionNumber}: no category found named "${questionCategoryName}".`
+            )
+          } else {
+            resolvedCategoryId = matchedCategory.id
+          }
+        }
 
         if (!questionText) {
           validationErrors.push(`Question ${questionNumber}: "question_text" is required.`)
@@ -455,8 +506,14 @@ function AdminPage() {
           )
         }
 
+        if (!resolvedCategoryId) {
+          validationErrors.push(
+            `Question ${questionNumber}: category is required (provide question.category or choose a fallback category in the UI).`
+          )
+        }
+
         return {
-          category_id: selectedCategoryId,
+          category_id: resolvedCategoryId,
           question_text: questionText,
           choice_a: typeof choices[0] === 'string' ? choices[0] : '',
           choice_b: typeof choices[1] === 'string' ? choices[1] : '',
@@ -469,7 +526,7 @@ function AdminPage() {
               : 'mc_single',
           difficulty: question.difficulty ?? null,
           is_active: question.is_active ?? true,
-          source_id: selectedSourceId || null,
+          source_id: resolvedSourceId,
           section: resolvedSection || null
         }
       })
@@ -888,9 +945,8 @@ function AdminPage() {
           name="category_id"
           value={selectedCategoryId}
           onChange={(event) => setSelectedCategoryId(event.target.value)}
-          required
         >
-          <option value="">Choose a category</option>
+          <option value="">No fallback category</option>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
@@ -898,7 +954,7 @@ function AdminPage() {
           ))}
         </select>
 
-        <label htmlFor="question-source">Source (optional)</label>
+        <label htmlFor="question-source">Source fallback (optional)</label>
         <select
           id="question-source"
           name="source_id"
