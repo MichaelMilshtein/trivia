@@ -50,9 +50,10 @@ function AdminPage() {
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   const [questionsError, setQuestionsError] = useState('')
   const [listCategoryId, setListCategoryId] = useState('')
-  const [listSourceIdFilter, setListSourceIdFilter] = useState('all')
+  const [listSourceIdFilter, setListSourceIdFilter] = useState('')
   const [listActiveFilter, setListActiveFilter] = useState('all')
   const [listSectionSearch, setListSectionSearch] = useState('')
+  const [listQuestionTypeFilter, setListQuestionTypeFilter] = useState('all')
   const [editingQuestionId, setEditingQuestionId] = useState('')
   const [editQuestionText, setEditQuestionText] = useState('')
   const [editChoiceA, setEditChoiceA] = useState('')
@@ -86,7 +87,7 @@ function AdminPage() {
 
     return categoryQuestions.filter((question) => {
       const sourceMatches =
-        listSourceIdFilter === 'all' ? true : String(question.source_id || '') === listSourceIdFilter
+        listSourceIdFilter ? String(question.source_id || '') === listSourceIdFilter : true
 
       const activeMatches =
         listActiveFilter === 'all'
@@ -100,9 +101,20 @@ function AdminPage() {
         ? sectionText.includes(normalizedSectionSearch)
         : true
 
-      return sourceMatches && activeMatches && sectionMatches
+      const questionTypeMatches =
+        listQuestionTypeFilter === 'all'
+          ? true
+          : (question.question_type || 'mc_single') === listQuestionTypeFilter
+
+      return sourceMatches && activeMatches && sectionMatches && questionTypeMatches
     })
-  }, [categoryQuestions, listSourceIdFilter, listActiveFilter, listSectionSearch])
+  }, [
+    categoryQuestions,
+    listSourceIdFilter,
+    listActiveFilter,
+    listSectionSearch,
+    listQuestionTypeFilter
+  ])
 
   async function loadCategories() {
     setError('')
@@ -122,22 +134,28 @@ function AdminPage() {
     setSources(rows)
   }
 
-  async function fetchCategoryQuestions(categoryId) {
+  async function fetchCategoryQuestions(sourceId, categoryId = '') {
+    const filters = {
+      source_id: `eq.${sourceId}`
+    }
+
+    if (categoryId) {
+      filters.category_id = `eq.${categoryId}`
+    }
+
     return selectFrom('questions', {
       columns: QUESTION_COLUMNS,
-      filters: {
-        category_id: `eq.${categoryId}`
-      }
+      filters
     })
   }
 
-  async function refreshCategoryQuestions(categoryId = listCategoryId) {
-    if (!categoryId) {
+  async function refreshCategoryQuestions(sourceId = listSourceIdFilter, categoryId = listCategoryId) {
+    if (!sourceId) {
       setCategoryQuestions([])
       return
     }
 
-    const rows = await fetchCategoryQuestions(categoryId)
+    const rows = await fetchCategoryQuestions(sourceId, categoryId)
     setCategoryQuestions(rows)
   }
 
@@ -213,7 +231,7 @@ function AdminPage() {
 
   useEffect(() => {
     async function loadQuestionsForCategory() {
-      if (!listCategoryId) {
+      if (!listSourceIdFilter) {
         setCategoryQuestions([])
         setQuestionsError('')
         resetQuestionEditForm()
@@ -224,7 +242,7 @@ function AdminPage() {
       setQuestionsError('')
 
       try {
-        const rows = await fetchCategoryQuestions(listCategoryId)
+        const rows = await fetchCategoryQuestions(listSourceIdFilter, listCategoryId)
         setCategoryQuestions(rows)
       } catch (err) {
         setQuestionsError(err instanceof Error ? err.message : 'Failed to load questions.')
@@ -234,7 +252,7 @@ function AdminPage() {
     }
 
     loadQuestionsForCategory()
-  }, [listCategoryId])
+  }, [listSourceIdFilter, listCategoryId])
 
   async function handleCreateCategory(event) {
     event.preventDefault()
@@ -376,7 +394,7 @@ function AdminPage() {
       setQuestionsJson('')
       setBatchSection('')
 
-      await refreshCategoryQuestions(listCategoryId)
+      await refreshCategoryQuestions()
     } catch (err) {
       if (err instanceof SyntaxError) {
         setImportError('Invalid JSON. Please paste valid JSON and try again.')
@@ -432,7 +450,7 @@ function AdminPage() {
       )
 
       setQuestionUpdateMessage('Question updated successfully.')
-      await refreshCategoryQuestions(listCategoryId)
+      await refreshCategoryQuestions()
     } catch (err) {
       setQuestionUpdateError(err instanceof Error ? err.message : 'Failed to update question.')
     } finally {
@@ -520,7 +538,7 @@ function AdminPage() {
       setQuestionActiveMessage(
         question.is_active ? 'Question deactivated successfully.' : 'Question reactivated successfully.'
       )
-      await refreshCategoryQuestions(listCategoryId)
+      await refreshCategoryQuestions()
     } catch (err) {
       setQuestionActiveError(
         err instanceof Error ? err.message : 'Failed to update question active status.'
@@ -976,33 +994,33 @@ function AdminPage() {
       <section className="admin-section">
         <h3>Questions List</h3>
         <div className="admin-filters">
-          <label htmlFor="list-category-filter">Category</label>
-          <select
-            id="list-category-filter"
-            name="list_category_filter"
-            value={listCategoryId}
-            onChange={(event) => setListCategoryId(event.target.value)}
-          >
-            <option value="">Choose a category</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-
           <label htmlFor="list-source-filter">Source</label>
           <select
             id="list-source-filter"
             name="list_source_filter"
             value={listSourceIdFilter}
             onChange={(event) => setListSourceIdFilter(event.target.value)}
+            required
           >
-            <option value="all">All sources</option>
-            <option value="">No source</option>
+            <option value="">Choose a source</option>
             {sources.map((source) => (
               <option key={source.id} value={source.id}>
                 {source.title}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="list-category-filter">Category (optional)</label>
+          <select
+            id="list-category-filter"
+            name="list_category_filter"
+            value={listCategoryId}
+            onChange={(event) => setListCategoryId(event.target.value)}
+          >
+            <option value="">All categories</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
               </option>
             ))}
           </select>
@@ -1028,15 +1046,26 @@ function AdminPage() {
             onChange={(event) => setListSectionSearch(event.target.value)}
             placeholder="Search section text"
           />
+
+          <label htmlFor="list-question-type-filter">Question type</label>
+          <select
+            id="list-question-type-filter"
+            name="list_question_type_filter"
+            value={listQuestionTypeFilter}
+            onChange={(event) => setListQuestionTypeFilter(event.target.value)}
+          >
+            <option value="all">All</option>
+            <option value="mc_single">mc_single</option>
+          </select>
         </div>
 
-        {!listCategoryId ? <p>Select a category to view questions.</p> : null}
+        {!listSourceIdFilter ? <p>Select a source to view questions.</p> : null}
         {isLoadingQuestions ? <p>Loading questions...</p> : null}
         {questionsError ? <p>{questionsError}</p> : null}
         {questionActiveMessage ? <p>{questionActiveMessage}</p> : null}
         {questionActiveError ? <p>{questionActiveError}</p> : null}
 
-        {listCategoryId && !isLoadingQuestions && !questionsError ? (
+        {listSourceIdFilter && !isLoadingQuestions && !questionsError ? (
           filteredCategoryQuestions.length > 0 ? (
             <ul>
               {filteredCategoryQuestions.map((question) => (
