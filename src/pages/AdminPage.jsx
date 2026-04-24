@@ -4,6 +4,13 @@ import { insertInto, selectFrom, updateRows } from '../lib/supabaseClient'
 const QUESTION_COLUMNS =
   'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,is_active,source_id,category_id,section'
 const QUESTION_PREVIEW_LENGTH = 80
+const QUESTION_SORT_FIELDS = {
+  source: 'source',
+  section: 'section',
+  category: 'category',
+  difficulty: 'difficulty',
+  active: 'active'
+}
 
 function AdminPage() {
   const [categories, setCategories] = useState([])
@@ -73,6 +80,8 @@ function AdminPage() {
   const [isTogglingQuestionActive, setIsTogglingQuestionActive] = useState(false)
   const [questionActiveMessage, setQuestionActiveMessage] = useState('')
   const [questionActiveError, setQuestionActiveError] = useState('')
+  const [questionSortField, setQuestionSortField] = useState(QUESTION_SORT_FIELDS.source)
+  const [questionSortDirection, setQuestionSortDirection] = useState('asc')
 
   const sourceTitlesById = useMemo(
     () =>
@@ -95,7 +104,7 @@ function AdminPage() {
   const filteredCategoryQuestions = useMemo(() => {
     const normalizedSectionSearch = listSectionSearch.trim().toLowerCase()
 
-    return categoryQuestions.filter((question) => {
+    const filteredQuestions = categoryQuestions.filter((question) => {
       const sourceMatches =
         listSourceIdFilter ? String(question.source_id || '') === listSourceIdFilter : true
 
@@ -118,13 +127,74 @@ function AdminPage() {
 
       return sourceMatches && activeMatches && sectionMatches && questionTypeMatches
     })
+
+    return [...filteredQuestions].sort((questionA, questionB) => {
+      function getSortValue(question) {
+        if (questionSortField === QUESTION_SORT_FIELDS.source) {
+          return (sourceTitlesById[question.source_id] || 'No source').toLowerCase()
+        }
+
+        if (questionSortField === QUESTION_SORT_FIELDS.section) {
+          return (question.section || '').toLowerCase()
+        }
+
+        if (questionSortField === QUESTION_SORT_FIELDS.category) {
+          return (categoryNamesById[question.category_id] || 'Unknown').toLowerCase()
+        }
+
+        if (questionSortField === QUESTION_SORT_FIELDS.difficulty) {
+          return (question.difficulty || 'unknown').toLowerCase()
+        }
+
+        if (questionSortField === QUESTION_SORT_FIELDS.active) {
+          return question.is_active ? 1 : 0
+        }
+
+        return ''
+      }
+
+      const valueA = getSortValue(questionA)
+      const valueB = getSortValue(questionB)
+
+      if (valueA < valueB) {
+        return questionSortDirection === 'asc' ? -1 : 1
+      }
+
+      if (valueA > valueB) {
+        return questionSortDirection === 'asc' ? 1 : -1
+      }
+
+      return String(questionA.id).localeCompare(String(questionB.id))
+    })
   }, [
     categoryQuestions,
     listSourceIdFilter,
     listActiveFilter,
     listSectionSearch,
-    listQuestionTypeFilter
+    listQuestionTypeFilter,
+    sourceTitlesById,
+    categoryNamesById,
+    questionSortField,
+    questionSortDirection
   ])
+
+  function handleQuestionSort(sortField) {
+    if (questionSortField === sortField) {
+      setQuestionSortDirection((currentDirection) => (currentDirection === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setQuestionSortField(sortField)
+    setQuestionSortDirection('asc')
+  }
+
+  function getSortDirectionIndicator(sortField) {
+    if (questionSortField !== sortField) {
+      return '↕'
+    }
+
+    return questionSortDirection === 'asc' ? '↑' : '↓'
+  }
 
   function getQuestionPreview(questionText) {
     const trimmedText = (questionText || '').trim()
@@ -1091,12 +1161,52 @@ function AdminPage() {
               <thead>
                 <tr>
                   <th scope="col">Question</th>
-                  <th scope="col">Source</th>
-                  <th scope="col">Section</th>
-                  <th scope="col">Category</th>
+                  <th scope="col">
+                    <button
+                      type="button"
+                      className="admin-sort-button"
+                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.source)}
+                    >
+                      Source {getSortDirectionIndicator(QUESTION_SORT_FIELDS.source)}
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button
+                      type="button"
+                      className="admin-sort-button"
+                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.section)}
+                    >
+                      Section {getSortDirectionIndicator(QUESTION_SORT_FIELDS.section)}
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button
+                      type="button"
+                      className="admin-sort-button"
+                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.category)}
+                    >
+                      Category {getSortDirectionIndicator(QUESTION_SORT_FIELDS.category)}
+                    </button>
+                  </th>
                   <th scope="col">Type</th>
-                  <th scope="col">Difficulty</th>
-                  <th scope="col">Active</th>
+                  <th scope="col">
+                    <button
+                      type="button"
+                      className="admin-sort-button"
+                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.difficulty)}
+                    >
+                      Difficulty {getSortDirectionIndicator(QUESTION_SORT_FIELDS.difficulty)}
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button
+                      type="button"
+                      className="admin-sort-button"
+                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.active)}
+                    >
+                      Active {getSortDirectionIndicator(QUESTION_SORT_FIELDS.active)}
+                    </button>
+                  </th>
                   <th scope="col">Actions</th>
                 </tr>
               </thead>
