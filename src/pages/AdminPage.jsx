@@ -389,149 +389,149 @@ function AdminPage() {
   }
 
   return (
-    <section>
+    <section className="admin-page">
       <h2>Admin</h2>
-      <h3>Create Category</h3>
-      <form onSubmit={handleCreateCategory}>
-        <label htmlFor="category-name">Name</label>
-        <input
-          id="category-name"
-          name="name"
-          type="text"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          required
-        />
+      <section className="admin-section">
+        <h3>Categories</h3>
+        <form onSubmit={handleCreateCategory}>
+          <label htmlFor="category-name">Name</label>
+          <input
+            id="category-name"
+            name="name"
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            required
+          />
 
-        <label htmlFor="category-description">Description</label>
-        <textarea
-          id="category-description"
-          name="description"
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-        />
+          <label htmlFor="category-description">Description</label>
+          <textarea
+            id="category-description"
+            name="description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
 
-        <label htmlFor="category-active">Is active</label>
-        <input
-          id="category-active"
-          name="is_active"
-          type="checkbox"
-          checked={isActive}
-          onChange={(event) => setIsActive(event.target.checked)}
-        />
+          <label htmlFor="category-active">Is active</label>
+          <input
+            id="category-active"
+            name="is_active"
+            type="checkbox"
+            checked={isActive}
+            onChange={(event) => setIsActive(event.target.checked)}
+          />
 
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create category'}
-        </button>
-      </form>
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Creating...' : 'Create category'}
+          </button>
+        </form>
 
-      {submitMessage ? <p>{submitMessage}</p> : null}
-      {submitError ? <p>{submitError}</p> : null}
+        {submitMessage ? <p>{submitMessage}</p> : null}
+        {submitError ? <p>{submitError}</p> : null}
+        {isLoading ? <p>Loading categories...</p> : null}
+        {error ? <p>{error}</p> : null}
 
-      <h3>Admin Categories</h3>
+        {!isLoading && !error ? (
+          categories.length > 0 ? (
+            <ul>
+              {categories.map((category) => (
+                <li key={category.id}>
+                  <h4>{category.name}</h4>
+                  <p>{category.description || 'No description'}</p>
+                  <p>Active: {category.is_active ? 'Yes' : 'No'}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No categories found.</p>
+          )
+        ) : null}
+      </section>
 
-      {isLoading ? <p>Loading categories...</p> : null}
-      {error ? <p>{error}</p> : null}
+      <section className="admin-section">
+        <h3>Sources</h3>
+        <form onSubmit={handleCreateSource}>
+          <label htmlFor="source-title">Title</label>
+          <input
+            id="source-title"
+            name="title"
+            type="text"
+            value={sourceTitle}
+            onChange={(event) => setSourceTitle(event.target.value)}
+            required
+          />
 
-      {!isLoading && !error ? (
-        categories.length > 0 ? (
-          <ul>
-            {categories.map((category) => (
-              <li key={category.id}>
-                <h4>{category.name}</h4>
-                <p>{category.description || 'No description'}</p>
-                <p>Active: {category.is_active ? 'Yes' : 'No'}</p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No categories found.</p>
-        )
-      ) : null}
+          <label htmlFor="source-type">Source type</label>
+          <input
+            id="source-type"
+            name="source_type"
+            type="text"
+            value={sourceType}
+            onChange={(event) => setSourceType(event.target.value)}
+            required
+          />
 
-      <h3>Create Source</h3>
-      <form onSubmit={handleCreateSource}>
-        <label htmlFor="source-title">Title</label>
-        <input
-          id="source-title"
-          name="title"
-          type="text"
-          value={sourceTitle}
-          onChange={(event) => setSourceTitle(event.target.value)}
-          required
-        />
+          <label htmlFor="source-section">Section</label>
+          <input
+            id="source-section"
+            name="section"
+            type="text"
+            value={sourceSection}
+            onChange={(event) => setSourceSection(event.target.value)}
+            required
+          />
 
-        <label htmlFor="source-type">Source type</label>
-        <input
-          id="source-type"
-          name="source_type"
-          type="text"
-          value={sourceType}
-          onChange={(event) => setSourceType(event.target.value)}
-          required
-        />
+          <label htmlFor="source-url">URL</label>
+          <input
+            id="source-url"
+            name="url"
+            type="url"
+            value={sourceUrl}
+            onChange={(event) => setSourceUrl(event.target.value)}
+            required
+          />
 
-        <label htmlFor="source-section">Section</label>
-        <input
-          id="source-section"
-          name="section"
-          type="text"
-          value={sourceSection}
-          onChange={(event) => setSourceSection(event.target.value)}
-          required
-        />
+          <label htmlFor="source-active">Is active</label>
+          <input
+            id="source-active"
+            name="is_active"
+            type="checkbox"
+            checked={sourceIsActive}
+            onChange={(event) => setSourceIsActive(event.target.checked)}
+          />
 
-        <label htmlFor="source-url">URL</label>
-        <input
-          id="source-url"
-          name="url"
-          type="url"
-          value={sourceUrl}
-          onChange={(event) => setSourceUrl(event.target.value)}
-          required
-        />
+          <button type="submit" disabled={isSubmittingSource}>
+            {isSubmittingSource ? 'Creating...' : 'Create source'}
+          </button>
+        </form>
 
-        <label htmlFor="source-active">Is active</label>
-        <input
-          id="source-active"
-          name="is_active"
-          type="checkbox"
-          checked={sourceIsActive}
-          onChange={(event) => setSourceIsActive(event.target.checked)}
-        />
+        {sourceSubmitMessage ? <p>{sourceSubmitMessage}</p> : null}
+        {sourceSubmitError ? <p>{sourceSubmitError}</p> : null}
+        {isLoading ? <p>Loading sources...</p> : null}
+        {!isLoading && !error ? (
+          sources.length > 0 ? (
+            <ul>
+              {sources.map((source) => (
+                <li key={source.id}>
+                  <p>
+                    <strong>{source.title}</strong>
+                  </p>
+                  <p>Source type: {source.source_type || 'N/A'}</p>
+                  <p>Section: {source.section || 'N/A'}</p>
+                  <p>URL: {source.url || 'N/A'}</p>
+                  <p>Active: {source.is_active ? 'Yes' : 'No'}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No sources found.</p>
+          )
+        ) : null}
+      </section>
 
-        <button type="submit" disabled={isSubmittingSource}>
-          {isSubmittingSource ? 'Creating...' : 'Create source'}
-        </button>
-      </form>
-
-      {sourceSubmitMessage ? <p>{sourceSubmitMessage}</p> : null}
-      {sourceSubmitError ? <p>{sourceSubmitError}</p> : null}
-
-      <h3>Admin Sources (Read Only)</h3>
-      {isLoading ? <p>Loading sources...</p> : null}
-      {!isLoading && !error ? (
-        sources.length > 0 ? (
-          <ul>
-            {sources.map((source) => (
-              <li key={source.id}>
-                <p>
-                  <strong>{source.title}</strong>
-                </p>
-                <p>Source type: {source.source_type || 'N/A'}</p>
-                <p>Section: {source.section || 'N/A'}</p>
-                <p>URL: {source.url || 'N/A'}</p>
-                <p>Active: {source.is_active ? 'Yes' : 'No'}</p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No sources found.</p>
-        )
-      ) : null}
-
-      <h3>Admin Questions Import</h3>
-      <form onSubmit={handleImportQuestions}>
+      <section className="admin-section">
+        <h3>Question Import</h3>
+        <form onSubmit={handleImportQuestions}>
         <label htmlFor="question-category">Category</label>
         <select
           id="question-category"
@@ -598,14 +598,16 @@ function AdminPage() {
         <button type="submit" disabled={isImporting}>
           {isImporting ? 'Importing...' : 'Import questions'}
         </button>
-      </form>
+        </form>
 
-      {importMessage ? <p>{importMessage}</p> : null}
-      {importError ? <p>{importError}</p> : null}
+        {importMessage ? <p>{importMessage}</p> : null}
+        {importError ? <p>{importError}</p> : null}
+      </section>
 
-      <h3>Question Editor</h3>
-      {!editingQuestionId ? <p>Click Edit on a question to load it into this form.</p> : null}
-      <form onSubmit={handleUpdateQuestion}>
+      <section className="admin-section">
+        <h3>Question Editor</h3>
+        {!editingQuestionId ? <p>Click Edit on a question to load it into this form.</p> : null}
+        <form onSubmit={handleUpdateQuestion}>
         <label htmlFor="edit-question-text">Question text</label>
         <textarea
           id="edit-question-text"
@@ -712,55 +714,58 @@ function AdminPage() {
         <button type="submit" disabled={!editingQuestionId || isUpdatingQuestion}>
           {isUpdatingQuestion ? 'Saving...' : 'Save question changes'}
         </button>
-      </form>
+        </form>
 
-      {questionUpdateMessage ? <p>{questionUpdateMessage}</p> : null}
-      {questionUpdateError ? <p>{questionUpdateError}</p> : null}
+        {questionUpdateMessage ? <p>{questionUpdateMessage}</p> : null}
+        {questionUpdateError ? <p>{questionUpdateError}</p> : null}
+      </section>
 
-      <h3>Category Questions (Read Only)</h3>
-      {!selectedCategoryId ? <p>Select a category to view questions.</p> : null}
-      {isLoadingQuestions ? <p>Loading questions...</p> : null}
-      {questionsError ? <p>{questionsError}</p> : null}
-      {questionActiveMessage ? <p>{questionActiveMessage}</p> : null}
-      {questionActiveError ? <p>{questionActiveError}</p> : null}
+      <section className="admin-section">
+        <h3>Questions List</h3>
+        {!selectedCategoryId ? <p>Select a category to view questions.</p> : null}
+        {isLoadingQuestions ? <p>Loading questions...</p> : null}
+        {questionsError ? <p>{questionsError}</p> : null}
+        {questionActiveMessage ? <p>{questionActiveMessage}</p> : null}
+        {questionActiveError ? <p>{questionActiveError}</p> : null}
 
-      {selectedCategoryId && !isLoadingQuestions && !questionsError ? (
-        categoryQuestions.length > 0 ? (
-          <ul>
-            {categoryQuestions.map((question) => (
-              <li key={question.id}>
-                <p>
-                  <strong>{question.question_text}</strong>
-                </p>
-                <p>
-                  A: {question.choice_a} | B: {question.choice_b} | C: {question.choice_c} | D:{' '}
-                  {question.choice_d}
-                </p>
-                <p>
-                  Correct index: {question.correct_index} | Difficulty:{' '}
-                  {question.difficulty || 'unknown'} | Active: {question.is_active ? 'Yes' : 'No'}
-                </p>
-                <p>
-                  Source: {sourceTitlesById[question.source_id] || 'No source'}
-                </p>
-                {question.section ? <p>Section: {question.section}</p> : null}
-                <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleQuestionActive(question)}
-                  disabled={isTogglingQuestionActive}
-                >
-                  {question.is_active ? 'Deactivate' : 'Reactivate'}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No questions found for this category.</p>
-        )
-      ) : null}
+        {selectedCategoryId && !isLoadingQuestions && !questionsError ? (
+          categoryQuestions.length > 0 ? (
+            <ul>
+              {categoryQuestions.map((question) => (
+                <li key={question.id}>
+                  <p>
+                    <strong>{question.question_text}</strong>
+                  </p>
+                  <p>
+                    A: {question.choice_a} | B: {question.choice_b} | C: {question.choice_c} | D:{' '}
+                    {question.choice_d}
+                  </p>
+                  <p>
+                    Correct index: {question.correct_index} | Difficulty:{' '}
+                    {question.difficulty || 'unknown'} | Active: {question.is_active ? 'Yes' : 'No'}
+                  </p>
+                  <p>
+                    Source: {sourceTitlesById[question.source_id] || 'No source'}
+                  </p>
+                  {question.section ? <p>Section: {question.section}</p> : null}
+                  <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleQuestionActive(question)}
+                    disabled={isTogglingQuestionActive}
+                  >
+                    {question.is_active ? 'Deactivate' : 'Reactivate'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No questions found for this category.</p>
+          )
+        ) : null}
+      </section>
     </section>
   )
 }
