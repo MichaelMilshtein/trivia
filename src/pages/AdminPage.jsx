@@ -3,6 +3,7 @@ import { insertInto, selectFrom, updateRows } from '../lib/supabaseClient'
 
 const QUESTION_COLUMNS =
   'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,is_active,source_id,category_id,section'
+const QUESTION_PREVIEW_LENGTH = 80
 
 function AdminPage() {
   const [categories, setCategories] = useState([])
@@ -124,6 +125,16 @@ function AdminPage() {
     listSectionSearch,
     listQuestionTypeFilter
   ])
+
+  function getQuestionPreview(questionText) {
+    const trimmedText = (questionText || '').trim()
+
+    if (trimmedText.length <= QUESTION_PREVIEW_LENGTH) {
+      return trimmedText
+    }
+
+    return `${trimmedText.slice(0, QUESTION_PREVIEW_LENGTH)}…`
+  }
 
   async function loadCategories() {
     setError('')
@@ -1076,37 +1087,49 @@ function AdminPage() {
 
         {listSourceIdFilter && !isLoadingQuestions && !questionsError ? (
           filteredCategoryQuestions.length > 0 ? (
-            <ul className="admin-question-list">
+            <table className="admin-question-table">
+              <thead>
+                <tr>
+                  <th scope="col">Question</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Section</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Difficulty</th>
+                  <th scope="col">Active</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
               {filteredCategoryQuestions.map((question) => (
-                <li key={question.id} className="admin-question-row">
-                  <div className="admin-question-main">
-                    <p className="admin-question-text">{question.question_text}</p>
-                    <div className="admin-question-meta">
-                      <span>
-                        Source: {sourceTitlesById[question.source_id] || 'No source'}
-                      </span>
-                      <span>Section: {question.section || '—'}</span>
-                      <span>Category: {categoryNamesById[question.category_id] || 'Unknown'}</span>
-                      <span>Type: {question.question_type || 'mc_single'}</span>
-                      <span>Difficulty: {question.difficulty || 'unknown'}</span>
-                      <span>Active: {question.is_active ? 'Yes' : 'No'}</span>
+                <tr key={question.id}>
+                  <td title={question.question_text || ''} className="admin-question-cell-preview">
+                    {getQuestionPreview(question.question_text) || '—'}
+                  </td>
+                  <td>{sourceTitlesById[question.source_id] || 'No source'}</td>
+                  <td>{question.section || '—'}</td>
+                  <td>{categoryNamesById[question.category_id] || 'Unknown'}</td>
+                  <td>{question.question_type || 'mc_single'}</td>
+                  <td>{question.difficulty || 'unknown'}</td>
+                  <td>{question.is_active ? 'Yes' : 'No'}</td>
+                  <td>
+                    <div className="admin-question-actions">
+                      <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleQuestionActive(question)}
+                        disabled={isTogglingQuestionActive}
+                      >
+                        {question.is_active ? 'Deactivate' : 'Reactivate'}
+                      </button>
                     </div>
-                  </div>
-                  <div className="admin-question-actions">
-                    <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleQuestionActive(question)}
-                      disabled={isTogglingQuestionActive}
-                    >
-                      {question.is_active ? 'Deactivate' : 'Reactivate'}
-                    </button>
-                  </div>
-                </li>
+                  </td>
+                </tr>
               ))}
-            </ul>
+              </tbody>
+            </table>
           ) : (
             <p>No questions found for the current filters.</p>
           )
