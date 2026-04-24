@@ -78,6 +78,30 @@ body {
   margin-top: 0;
 }
 
+.admin-section-summary {
+  cursor: pointer;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.admin-helper-note {
+  margin-bottom: 0.75rem;
+}
+
+.admin-helper-note summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.admin-helper-note pre {
+  overflow-x: auto;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  font-size: 0.85rem;
+}
+
 .admin-filters {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

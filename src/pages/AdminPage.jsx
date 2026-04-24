@@ -698,105 +698,394 @@ function AdminPage() {
   return (
     <section className="admin-page">
       <h2>Admin</h2>
-      <section className="admin-section">
-        <h3>Categories</h3>
-        <form onSubmit={handleCreateCategory}>
-          <label htmlFor="category-name">Name</label>
+      <details className="admin-section" open>
+        <summary className="admin-section-summary">Question Import</summary>
+        <details className="admin-helper-note">
+          <summary>JSON v1 helper note</summary>
+          <p>Use this format for import payloads (supports optional source_title, section, and category):</p>
+          <pre>{`{
+  "source_title": "Weekly Trivia",
+  "section": "Round 1",
+  "questions": [
+    {
+      "question_text": "...",
+      "category": "History",
+      "choices": ["A", "B", "C", "D"],
+      "correct_index": 0,
+      "question_type": "mc_single",
+      "section": "Round 1",
+      "difficulty": "medium",
+      "is_active": true
+    }
+  ]
+}`}</pre>
+        </details>
+        <form onSubmit={handleImportQuestions}>
+          <label htmlFor="question-category">Category</label>
+          <select
+            id="question-category"
+            name="category_id"
+            value={selectedCategoryId}
+            onChange={(event) => setSelectedCategoryId(event.target.value)}
+          >
+            <option value="">No fallback category</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="question-source">Source fallback (optional)</label>
+          <select
+            id="question-source"
+            name="source_id"
+            value={selectedSourceId}
+            onChange={(event) => setSelectedSourceId(event.target.value)}
+          >
+            <option value="">No source</option>
+            {sources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.title}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="question-batch-section">Batch section (optional)</label>
           <input
-            id="category-name"
-            name="name"
+            id="question-batch-section"
+            name="batch_section"
             type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
+            value={batchSection}
+            onChange={(event) => setBatchSection(event.target.value)}
+            placeholder="Used when a question does not include section"
+          />
+
+          <label htmlFor="questions-json">Questions JSON</label>
+          <textarea
+            id="questions-json"
+            name="questions_json"
+            rows={16}
+            value={questionsJson}
+            onChange={(event) => setQuestionsJson(event.target.value)}
+            placeholder={`{
+  "questions": [
+    {
+      "question_text": "...",
+      "choices": ["A", "B", "C", "D"],
+      "correct_index": 0,
+      "question_type": "mc_single",
+      "section": "Round 1",
+      "difficulty": "medium",
+      "is_active": true
+    }
+  ]
+}`}
             required
           />
 
-          <label htmlFor="category-description">Description</label>
-          <textarea
-            id="category-description"
-            name="description"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-
-          <label htmlFor="category-active">Is active</label>
-          <input
-            id="category-active"
-            name="is_active"
-            type="checkbox"
-            checked={isActive}
-            onChange={(event) => setIsActive(event.target.checked)}
-          />
-
-          <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating...' : 'Create category'}
+          <button type="submit" disabled={isImporting}>
+            {isImporting ? 'Importing...' : 'Import questions'}
           </button>
         </form>
 
-        {submitMessage ? <p>{submitMessage}</p> : null}
-        {submitError ? <p>{submitError}</p> : null}
-        {categoryUpdateMessage ? <p>{categoryUpdateMessage}</p> : null}
-        {categoryUpdateError ? <p>{categoryUpdateError}</p> : null}
-        {isLoading ? <p>Loading categories...</p> : null}
-        {error ? <p>{error}</p> : null}
+        {importMessage ? <p>{importMessage}</p> : null}
+        {importError ? <p>{importError}</p> : null}
+      </details>
 
-        {!isLoading && !error ? (
-          categories.length > 0 ? (
-            <ul>
-              {categories.map((category) => (
-                <li key={category.id}>
-                  <h4>{category.name}</h4>
-                  <p>{category.description || 'No description'}</p>
-                  <p>Active: {category.is_active ? 'Yes' : 'No'}</p>
-                  <button type="button" onClick={() => loadCategoryIntoEditForm(category)}>
-                    Edit
-                  </button>
-                </li>
-              ))}
-            </ul>
+      <details className="admin-section" open>
+        <summary className="admin-section-summary">Questions List</summary>
+        <div className="admin-filters">
+          <label htmlFor="list-source-filter">Source</label>
+          <select
+            id="list-source-filter"
+            name="list_source_filter"
+            value={listSourceIdFilter}
+            onChange={(event) => setListSourceIdFilter(event.target.value)}
+            required
+          >
+            <option value="">Choose a source</option>
+            {sources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.title}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="list-category-filter">Category (optional)</label>
+          <select
+            id="list-category-filter"
+            name="list_category_filter"
+            value={listCategoryId}
+            onChange={(event) => setListCategoryId(event.target.value)}
+          >
+            <option value="">All categories</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="list-active-filter">Active status</label>
+          <select
+            id="list-active-filter"
+            name="list_active_filter"
+            value={listActiveFilter}
+            onChange={(event) => setListActiveFilter(event.target.value)}
+          >
+            <option value="all">All</option>
+            <option value="active">Active only</option>
+            <option value="inactive">Inactive only</option>
+          </select>
+
+          <label htmlFor="list-section-search">Section search</label>
+          <input
+            id="list-section-search"
+            name="list_section_search"
+            type="text"
+            value={listSectionSearch}
+            onChange={(event) => setListSectionSearch(event.target.value)}
+            placeholder="Search section text"
+          />
+
+          <label htmlFor="list-question-type-filter">Question type</label>
+          <select
+            id="list-question-type-filter"
+            name="list_question_type_filter"
+            value={listQuestionTypeFilter}
+            onChange={(event) => setListQuestionTypeFilter(event.target.value)}
+          >
+            <option value="all">All</option>
+            <option value="mc_single">mc_single</option>
+          </select>
+        </div>
+
+        {!listSourceIdFilter ? <p>Select a source to view questions.</p> : null}
+        {isLoadingQuestions ? <p>Loading questions...</p> : null}
+        {questionsError ? <p>{questionsError}</p> : null}
+        {questionActiveMessage ? <p>{questionActiveMessage}</p> : null}
+        {questionActiveError ? <p>{questionActiveError}</p> : null}
+
+        {listSourceIdFilter && !isLoadingQuestions && !questionsError ? (
+          filteredCategoryQuestions.length > 0 ? (
+            <table className="admin-question-table">
+              <thead>
+                <tr>
+                  <th scope="col">Question</th>
+                  <th scope="col">
+                    <button
+                      type="button"
+                      className="admin-sort-button"
+                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.source)}
+                    >
+                      Source {getSortDirectionIndicator(QUESTION_SORT_FIELDS.source)}
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button
+                      type="button"
+                      className="admin-sort-button"
+                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.section)}
+                    >
+                      Section {getSortDirectionIndicator(QUESTION_SORT_FIELDS.section)}
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button
+                      type="button"
+                      className="admin-sort-button"
+                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.category)}
+                    >
+                      Category {getSortDirectionIndicator(QUESTION_SORT_FIELDS.category)}
+                    </button>
+                  </th>
+                  <th scope="col">Type</th>
+                  <th scope="col">
+                    <button
+                      type="button"
+                      className="admin-sort-button"
+                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.difficulty)}
+                    >
+                      Difficulty {getSortDirectionIndicator(QUESTION_SORT_FIELDS.difficulty)}
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button
+                      type="button"
+                      className="admin-sort-button"
+                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.active)}
+                    >
+                      Active {getSortDirectionIndicator(QUESTION_SORT_FIELDS.active)}
+                    </button>
+                  </th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCategoryQuestions.map((question) => (
+                  <tr key={question.id}>
+                    <td title={question.question_text || ''} className="admin-question-cell-preview">
+                      {getQuestionPreview(question.question_text) || '—'}
+                    </td>
+                    <td>{sourceTitlesById[question.source_id] || 'No source'}</td>
+                    <td>{question.section || '—'}</td>
+                    <td>{categoryNamesById[question.category_id] || 'Unknown'}</td>
+                    <td>{question.question_type || 'mc_single'}</td>
+                    <td>{question.difficulty || 'unknown'}</td>
+                    <td>{question.is_active ? 'Yes' : 'No'}</td>
+                    <td>
+                      <div className="admin-question-actions">
+                        <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleQuestionActive(question)}
+                          disabled={isTogglingQuestionActive}
+                        >
+                          {question.is_active ? 'Deactivate' : 'Reactivate'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
-            <p>No categories found.</p>
+            <p>No questions found for the current filters.</p>
           )
         ) : null}
+      </details>
 
-        <h4>Category Editor</h4>
-        {!editingCategoryId ? <p>Click Edit on a category to load it into this form.</p> : null}
-        <form onSubmit={handleUpdateCategory}>
-          <label htmlFor="edit-category-name">Name</label>
-          <input
-            id="edit-category-name"
-            name="edit_category_name"
-            type="text"
-            value={editCategoryName}
-            onChange={(event) => setEditCategoryName(event.target.value)}
+      <details className="admin-section">
+        <summary className="admin-section-summary">Question Editor</summary>
+        {!editingQuestionId ? <p>Click Edit on a question to load it into this form.</p> : null}
+        <form onSubmit={handleUpdateQuestion}>
+          <label htmlFor="edit-question-text">Question text</label>
+          <textarea
+            id="edit-question-text"
+            name="question_text"
+            value={editQuestionText}
+            onChange={(event) => setEditQuestionText(event.target.value)}
             required
           />
 
-          <label htmlFor="edit-category-description">Description</label>
-          <textarea
-            id="edit-category-description"
-            name="edit_category_description"
-            value={editCategoryDescription}
-            onChange={(event) => setEditCategoryDescription(event.target.value)}
-          />
-
-          <label htmlFor="edit-category-active">Is active</label>
+          <label htmlFor="edit-choice-a">Choice A</label>
           <input
-            id="edit-category-active"
-            name="edit_category_is_active"
-            type="checkbox"
-            checked={editCategoryIsActive}
-            onChange={(event) => setEditCategoryIsActive(event.target.checked)}
+            id="edit-choice-a"
+            name="choice_a"
+            type="text"
+            value={editChoiceA}
+            onChange={(event) => setEditChoiceA(event.target.value)}
+            required
           />
 
-          <button type="submit" disabled={!editingCategoryId || isUpdatingCategory}>
-            {isUpdatingCategory ? 'Saving...' : 'Save category changes'}
+          <label htmlFor="edit-choice-b">Choice B</label>
+          <input
+            id="edit-choice-b"
+            name="choice_b"
+            type="text"
+            value={editChoiceB}
+            onChange={(event) => setEditChoiceB(event.target.value)}
+            required
+          />
+
+          <label htmlFor="edit-choice-c">Choice C</label>
+          <input
+            id="edit-choice-c"
+            name="choice_c"
+            type="text"
+            value={editChoiceC}
+            onChange={(event) => setEditChoiceC(event.target.value)}
+            required
+          />
+
+          <label htmlFor="edit-choice-d">Choice D</label>
+          <input
+            id="edit-choice-d"
+            name="choice_d"
+            type="text"
+            value={editChoiceD}
+            onChange={(event) => setEditChoiceD(event.target.value)}
+            required
+          />
+
+          <label htmlFor="edit-correct-index">Correct index</label>
+          <input
+            id="edit-correct-index"
+            name="correct_index"
+            type="number"
+            min={0}
+            max={3}
+            value={editCorrectIndex}
+            onChange={(event) => setEditCorrectIndex(event.target.value)}
+            required
+          />
+
+          <label htmlFor="edit-difficulty">Difficulty</label>
+          <input
+            id="edit-difficulty"
+            name="difficulty"
+            type="text"
+            value={editDifficulty}
+            onChange={(event) => setEditDifficulty(event.target.value)}
+          />
+
+          <label htmlFor="edit-question-type">Question type</label>
+          <select
+            id="edit-question-type"
+            name="question_type"
+            value={editQuestionType}
+            onChange={(event) => setEditQuestionType(event.target.value)}
+          >
+            <option value="mc_single">mc_single</option>
+          </select>
+
+          <label htmlFor="edit-active">Is active</label>
+          <input
+            id="edit-active"
+            name="is_active"
+            type="checkbox"
+            checked={editIsActive}
+            onChange={(event) => setEditIsActive(event.target.checked)}
+          />
+
+          <label htmlFor="edit-section">Section</label>
+          <input
+            id="edit-section"
+            name="section"
+            type="text"
+            value={editSection}
+            onChange={(event) => setEditSection(event.target.value)}
+          />
+
+          <label htmlFor="edit-source">Source</label>
+          <select
+            id="edit-source"
+            name="source_id"
+            value={editSourceId}
+            onChange={(event) => setEditSourceId(event.target.value)}
+          >
+            <option value="">No source</option>
+            {sources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.title}
+              </option>
+            ))}
+          </select>
+
+          <button type="submit" disabled={!editingQuestionId || isUpdatingQuestion}>
+            {isUpdatingQuestion ? 'Saving...' : 'Save question changes'}
           </button>
         </form>
-      </section>
 
-      <section className="admin-section">
-        <h3>Sources</h3>
+        {questionUpdateMessage ? <p>{questionUpdateMessage}</p> : null}
+        {questionUpdateError ? <p>{questionUpdateError}</p> : null}
+      </details>
+
+      <details className="admin-section">
+        <summary className="admin-section-summary">Sources</summary>
         <form onSubmit={handleCreateSource}>
           <label htmlFor="source-title">Title</label>
           <input
@@ -934,373 +1223,104 @@ function AdminPage() {
             {isUpdatingSource ? 'Saving...' : 'Save source changes'}
           </button>
         </form>
-      </section>
+      </details>
 
-      <section className="admin-section">
-        <h3>Question Import</h3>
-        <form onSubmit={handleImportQuestions}>
-        <label htmlFor="question-category">Category</label>
-        <select
-          id="question-category"
-          name="category_id"
-          value={selectedCategoryId}
-          onChange={(event) => setSelectedCategoryId(event.target.value)}
-        >
-          <option value="">No fallback category</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
-
-        <label htmlFor="question-source">Source fallback (optional)</label>
-        <select
-          id="question-source"
-          name="source_id"
-          value={selectedSourceId}
-          onChange={(event) => setSelectedSourceId(event.target.value)}
-        >
-          <option value="">No source</option>
-          {sources.map((source) => (
-            <option key={source.id} value={source.id}>
-              {source.title}
-            </option>
-          ))}
-        </select>
-
-        <label htmlFor="question-batch-section">Batch section (optional)</label>
-        <input
-          id="question-batch-section"
-          name="batch_section"
-          type="text"
-          value={batchSection}
-          onChange={(event) => setBatchSection(event.target.value)}
-          placeholder="Used when a question does not include section"
-        />
-
-        <label htmlFor="questions-json">Questions JSON</label>
-        <textarea
-          id="questions-json"
-          name="questions_json"
-          rows={16}
-          value={questionsJson}
-          onChange={(event) => setQuestionsJson(event.target.value)}
-          placeholder={`{
-  "questions": [
-    {
-      "question_text": "...",
-      "choices": ["A", "B", "C", "D"],
-      "correct_index": 0,
-      "question_type": "mc_single",
-      "section": "Round 1",
-      "difficulty": "medium",
-      "is_active": true
-    }
-  ]
-}`}
-          required
-        />
-
-        <button type="submit" disabled={isImporting}>
-          {isImporting ? 'Importing...' : 'Import questions'}
-        </button>
-        </form>
-
-        {importMessage ? <p>{importMessage}</p> : null}
-        {importError ? <p>{importError}</p> : null}
-      </section>
-
-      <section className="admin-section">
-        <h3>Question Editor</h3>
-        {!editingQuestionId ? <p>Click Edit on a question to load it into this form.</p> : null}
-        <form onSubmit={handleUpdateQuestion}>
-        <label htmlFor="edit-question-text">Question text</label>
-        <textarea
-          id="edit-question-text"
-          name="question_text"
-          value={editQuestionText}
-          onChange={(event) => setEditQuestionText(event.target.value)}
-          required
-        />
-
-        <label htmlFor="edit-choice-a">Choice A</label>
-        <input
-          id="edit-choice-a"
-          name="choice_a"
-          type="text"
-          value={editChoiceA}
-          onChange={(event) => setEditChoiceA(event.target.value)}
-          required
-        />
-
-        <label htmlFor="edit-choice-b">Choice B</label>
-        <input
-          id="edit-choice-b"
-          name="choice_b"
-          type="text"
-          value={editChoiceB}
-          onChange={(event) => setEditChoiceB(event.target.value)}
-          required
-        />
-
-        <label htmlFor="edit-choice-c">Choice C</label>
-        <input
-          id="edit-choice-c"
-          name="choice_c"
-          type="text"
-          value={editChoiceC}
-          onChange={(event) => setEditChoiceC(event.target.value)}
-          required
-        />
-
-        <label htmlFor="edit-choice-d">Choice D</label>
-        <input
-          id="edit-choice-d"
-          name="choice_d"
-          type="text"
-          value={editChoiceD}
-          onChange={(event) => setEditChoiceD(event.target.value)}
-          required
-        />
-
-        <label htmlFor="edit-correct-index">Correct index</label>
-        <input
-          id="edit-correct-index"
-          name="correct_index"
-          type="number"
-          min={0}
-          max={3}
-          value={editCorrectIndex}
-          onChange={(event) => setEditCorrectIndex(event.target.value)}
-          required
-        />
-
-        <label htmlFor="edit-difficulty">Difficulty</label>
-        <input
-          id="edit-difficulty"
-          name="difficulty"
-          type="text"
-          value={editDifficulty}
-          onChange={(event) => setEditDifficulty(event.target.value)}
-        />
-
-        <label htmlFor="edit-question-type">Question type</label>
-        <select
-          id="edit-question-type"
-          name="question_type"
-          value={editQuestionType}
-          onChange={(event) => setEditQuestionType(event.target.value)}
-        >
-          <option value="mc_single">mc_single</option>
-        </select>
-
-        <label htmlFor="edit-active">Is active</label>
-        <input
-          id="edit-active"
-          name="is_active"
-          type="checkbox"
-          checked={editIsActive}
-          onChange={(event) => setEditIsActive(event.target.checked)}
-        />
-
-        <label htmlFor="edit-section">Section</label>
-        <input
-          id="edit-section"
-          name="section"
-          type="text"
-          value={editSection}
-          onChange={(event) => setEditSection(event.target.value)}
-        />
-
-        <label htmlFor="edit-source">Source</label>
-        <select
-          id="edit-source"
-          name="source_id"
-          value={editSourceId}
-          onChange={(event) => setEditSourceId(event.target.value)}
-        >
-          <option value="">No source</option>
-          {sources.map((source) => (
-            <option key={source.id} value={source.id}>
-              {source.title}
-            </option>
-          ))}
-        </select>
-
-        <button type="submit" disabled={!editingQuestionId || isUpdatingQuestion}>
-          {isUpdatingQuestion ? 'Saving...' : 'Save question changes'}
-        </button>
-        </form>
-
-        {questionUpdateMessage ? <p>{questionUpdateMessage}</p> : null}
-        {questionUpdateError ? <p>{questionUpdateError}</p> : null}
-      </section>
-
-      <section className="admin-section">
-        <h3>Questions List</h3>
-        <div className="admin-filters">
-          <label htmlFor="list-source-filter">Source</label>
-          <select
-            id="list-source-filter"
-            name="list_source_filter"
-            value={listSourceIdFilter}
-            onChange={(event) => setListSourceIdFilter(event.target.value)}
-            required
-          >
-            <option value="">Choose a source</option>
-            {sources.map((source) => (
-              <option key={source.id} value={source.id}>
-                {source.title}
-              </option>
-            ))}
-          </select>
-
-          <label htmlFor="list-category-filter">Category (optional)</label>
-          <select
-            id="list-category-filter"
-            name="list_category_filter"
-            value={listCategoryId}
-            onChange={(event) => setListCategoryId(event.target.value)}
-          >
-            <option value="">All categories</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-
-          <label htmlFor="list-active-filter">Active status</label>
-          <select
-            id="list-active-filter"
-            name="list_active_filter"
-            value={listActiveFilter}
-            onChange={(event) => setListActiveFilter(event.target.value)}
-          >
-            <option value="all">All</option>
-            <option value="active">Active only</option>
-            <option value="inactive">Inactive only</option>
-          </select>
-
-          <label htmlFor="list-section-search">Section search</label>
+      <details className="admin-section">
+        <summary className="admin-section-summary">Categories</summary>
+        <form onSubmit={handleCreateCategory}>
+          <label htmlFor="category-name">Name</label>
           <input
-            id="list-section-search"
-            name="list_section_search"
+            id="category-name"
+            name="name"
             type="text"
-            value={listSectionSearch}
-            onChange={(event) => setListSectionSearch(event.target.value)}
-            placeholder="Search section text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            required
           />
 
-          <label htmlFor="list-question-type-filter">Question type</label>
-          <select
-            id="list-question-type-filter"
-            name="list_question_type_filter"
-            value={listQuestionTypeFilter}
-            onChange={(event) => setListQuestionTypeFilter(event.target.value)}
-          >
-            <option value="all">All</option>
-            <option value="mc_single">mc_single</option>
-          </select>
-        </div>
+          <label htmlFor="category-description">Description</label>
+          <textarea
+            id="category-description"
+            name="description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
 
-        {!listSourceIdFilter ? <p>Select a source to view questions.</p> : null}
-        {isLoadingQuestions ? <p>Loading questions...</p> : null}
-        {questionsError ? <p>{questionsError}</p> : null}
-        {questionActiveMessage ? <p>{questionActiveMessage}</p> : null}
-        {questionActiveError ? <p>{questionActiveError}</p> : null}
+          <label htmlFor="category-active">Is active</label>
+          <input
+            id="category-active"
+            name="is_active"
+            type="checkbox"
+            checked={isActive}
+            onChange={(event) => setIsActive(event.target.checked)}
+          />
 
-        {listSourceIdFilter && !isLoadingQuestions && !questionsError ? (
-          filteredCategoryQuestions.length > 0 ? (
-            <table className="admin-question-table">
-              <thead>
-                <tr>
-                  <th scope="col">Question</th>
-                  <th scope="col">
-                    <button
-                      type="button"
-                      className="admin-sort-button"
-                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.source)}
-                    >
-                      Source {getSortDirectionIndicator(QUESTION_SORT_FIELDS.source)}
-                    </button>
-                  </th>
-                  <th scope="col">
-                    <button
-                      type="button"
-                      className="admin-sort-button"
-                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.section)}
-                    >
-                      Section {getSortDirectionIndicator(QUESTION_SORT_FIELDS.section)}
-                    </button>
-                  </th>
-                  <th scope="col">
-                    <button
-                      type="button"
-                      className="admin-sort-button"
-                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.category)}
-                    >
-                      Category {getSortDirectionIndicator(QUESTION_SORT_FIELDS.category)}
-                    </button>
-                  </th>
-                  <th scope="col">Type</th>
-                  <th scope="col">
-                    <button
-                      type="button"
-                      className="admin-sort-button"
-                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.difficulty)}
-                    >
-                      Difficulty {getSortDirectionIndicator(QUESTION_SORT_FIELDS.difficulty)}
-                    </button>
-                  </th>
-                  <th scope="col">
-                    <button
-                      type="button"
-                      className="admin-sort-button"
-                      onClick={() => handleQuestionSort(QUESTION_SORT_FIELDS.active)}
-                    >
-                      Active {getSortDirectionIndicator(QUESTION_SORT_FIELDS.active)}
-                    </button>
-                  </th>
-                  <th scope="col">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-              {filteredCategoryQuestions.map((question) => (
-                <tr key={question.id}>
-                  <td title={question.question_text || ''} className="admin-question-cell-preview">
-                    {getQuestionPreview(question.question_text) || '—'}
-                  </td>
-                  <td>{sourceTitlesById[question.source_id] || 'No source'}</td>
-                  <td>{question.section || '—'}</td>
-                  <td>{categoryNamesById[question.category_id] || 'Unknown'}</td>
-                  <td>{question.question_type || 'mc_single'}</td>
-                  <td>{question.difficulty || 'unknown'}</td>
-                  <td>{question.is_active ? 'Yes' : 'No'}</td>
-                  <td>
-                    <div className="admin-question-actions">
-                      <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleQuestionActive(question)}
-                        disabled={isTogglingQuestionActive}
-                      >
-                        {question.is_active ? 'Deactivate' : 'Reactivate'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Creating...' : 'Create category'}
+          </button>
+        </form>
+
+        {submitMessage ? <p>{submitMessage}</p> : null}
+        {submitError ? <p>{submitError}</p> : null}
+        {categoryUpdateMessage ? <p>{categoryUpdateMessage}</p> : null}
+        {categoryUpdateError ? <p>{categoryUpdateError}</p> : null}
+        {isLoading ? <p>Loading categories...</p> : null}
+        {error ? <p>{error}</p> : null}
+
+        {!isLoading && !error ? (
+          categories.length > 0 ? (
+            <ul>
+              {categories.map((category) => (
+                <li key={category.id}>
+                  <h4>{category.name}</h4>
+                  <p>{category.description || 'No description'}</p>
+                  <p>Active: {category.is_active ? 'Yes' : 'No'}</p>
+                  <button type="button" onClick={() => loadCategoryIntoEditForm(category)}>
+                    Edit
+                  </button>
+                </li>
               ))}
-              </tbody>
-            </table>
+            </ul>
           ) : (
-            <p>No questions found for the current filters.</p>
+            <p>No categories found.</p>
           )
         ) : null}
-      </section>
+
+        <h4>Category Editor</h4>
+        {!editingCategoryId ? <p>Click Edit on a category to load it into this form.</p> : null}
+        <form onSubmit={handleUpdateCategory}>
+          <label htmlFor="edit-category-name">Name</label>
+          <input
+            id="edit-category-name"
+            name="edit_category_name"
+            type="text"
+            value={editCategoryName}
+            onChange={(event) => setEditCategoryName(event.target.value)}
+            required
+          />
+
+          <label htmlFor="edit-category-description">Description</label>
+          <textarea
+            id="edit-category-description"
+            name="edit_category_description"
+            value={editCategoryDescription}
+            onChange={(event) => setEditCategoryDescription(event.target.value)}
+          />
+
+          <label htmlFor="edit-category-active">Is active</label>
+          <input
+            id="edit-category-active"
+            name="edit_category_is_active"
+            type="checkbox"
+            checked={editCategoryIsActive}
+            onChange={(event) => setEditCategoryIsActive(event.target.checked)}
+          />
+
+          <button type="submit" disabled={!editingCategoryId || isUpdatingCategory}>
+            {isUpdatingCategory ? 'Saving...' : 'Save category changes'}
+          </button>
+        </form>
+      </details>
     </section>
   )
 }
