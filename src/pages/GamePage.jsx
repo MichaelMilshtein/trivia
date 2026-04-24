@@ -64,10 +64,11 @@ function GamePage() {
 
       try {
         const rows = await selectFrom('questions', {
-          columns: 'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,section',
+          columns: 'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,section',
           filters: {
             is_active: 'eq.true',
-            source_id: `eq.${selectedSourceId}`
+            source_id: `eq.${selectedSourceId}`,
+            question_type: 'eq.mc_single'
           }
         })
 

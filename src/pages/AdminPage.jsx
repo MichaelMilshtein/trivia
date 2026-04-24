@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { insertInto, selectFrom, updateRows } from '../lib/supabaseClient'
 
 const QUESTION_COLUMNS =
-  'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,difficulty,is_active,source_id,section'
+  'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,is_active,source_id,section'
 
 function AdminPage() {
   const [categories, setCategories] = useState([])
@@ -60,6 +60,7 @@ function AdminPage() {
   const [editChoiceC, setEditChoiceC] = useState('')
   const [editChoiceD, setEditChoiceD] = useState('')
   const [editCorrectIndex, setEditCorrectIndex] = useState('0')
+  const [editQuestionType, setEditQuestionType] = useState('mc_single')
   const [editDifficulty, setEditDifficulty] = useState('')
   const [editIsActive, setEditIsActive] = useState(true)
   const [editSection, setEditSection] = useState('')
@@ -148,6 +149,7 @@ function AdminPage() {
     setEditChoiceC('')
     setEditChoiceD('')
     setEditCorrectIndex('0')
+    setEditQuestionType('mc_single')
     setEditDifficulty('')
     setEditIsActive(true)
     setEditSection('')
@@ -162,6 +164,7 @@ function AdminPage() {
     setEditChoiceC(question.choice_c || '')
     setEditChoiceD(question.choice_d || '')
     setEditCorrectIndex(String(question.correct_index ?? 0))
+    setEditQuestionType(question.question_type || 'mc_single')
     setEditDifficulty(question.difficulty || '')
     setEditIsActive(Boolean(question.is_active))
     setEditSection(question.section || '')
@@ -352,6 +355,10 @@ function AdminPage() {
           choice_c: typeof choices[2] === 'string' ? choices[2] : '',
           choice_d: typeof choices[3] === 'string' ? choices[3] : '',
           correct_index: correctIndex,
+          question_type:
+            typeof question.question_type === 'string' && question.question_type.trim()
+              ? question.question_type.trim()
+              : 'mc_single',
           difficulty: question.difficulty ?? null,
           is_active: question.is_active ?? true,
           source_id: selectedSourceId || null,
@@ -415,6 +422,7 @@ function AdminPage() {
           choice_c: editChoiceC.trim(),
           choice_d: editChoiceD.trim(),
           correct_index: parsedCorrectIndex,
+          question_type: editQuestionType,
           difficulty: editDifficulty.trim() || null,
           is_active: editIsActive,
           section: editSection.trim() || null,
@@ -820,6 +828,7 @@ function AdminPage() {
       "question_text": "...",
       "choices": ["A", "B", "C", "D"],
       "correct_index": 0,
+      "question_type": "mc_single",
       "section": "Round 1",
       "difficulty": "medium",
       "is_active": true
@@ -911,6 +920,16 @@ function AdminPage() {
           value={editDifficulty}
           onChange={(event) => setEditDifficulty(event.target.value)}
         />
+
+        <label htmlFor="edit-question-type">Question type</label>
+        <select
+          id="edit-question-type"
+          name="question_type"
+          value={editQuestionType}
+          onChange={(event) => setEditQuestionType(event.target.value)}
+        >
+          <option value="mc_single">mc_single</option>
+        </select>
 
         <label htmlFor="edit-active">Is active</label>
         <input
@@ -1033,6 +1052,7 @@ function AdminPage() {
                     Correct index: {question.correct_index} | Difficulty:{' '}
                     {question.difficulty || 'unknown'} | Active: {question.is_active ? 'Yes' : 'No'}
                   </p>
+                  <p>Question type: {question.question_type || 'mc_single'}</p>
                   <p>
                     Source: {sourceTitlesById[question.source_id] || 'No source'}
                   </p>
