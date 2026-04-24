@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { insertInto, selectFrom, updateRows } from '../lib/supabaseClient'
 
 const QUESTION_COLUMNS =
-  'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,is_active,source_id,section'
+  'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,is_active,source_id,category_id,section'
 
 function AdminPage() {
   const [categories, setCategories] = useState([])
@@ -80,6 +80,15 @@ function AdminPage() {
         return accumulator
       }, {}),
     [sources]
+  )
+
+  const categoryNamesById = useMemo(
+    () =>
+      categories.reduce((accumulator, category) => {
+        accumulator[category.id] = category.name
+        return accumulator
+      }, {}),
+    [categories]
   )
 
   const filteredCategoryQuestions = useMemo(() => {
@@ -1067,35 +1076,34 @@ function AdminPage() {
 
         {listSourceIdFilter && !isLoadingQuestions && !questionsError ? (
           filteredCategoryQuestions.length > 0 ? (
-            <ul>
+            <ul className="admin-question-list">
               {filteredCategoryQuestions.map((question) => (
-                <li key={question.id}>
-                  <p>
-                    <strong>{question.question_text}</strong>
-                  </p>
-                  <p>
-                    A: {question.choice_a} | B: {question.choice_b} | C: {question.choice_c} | D:{' '}
-                    {question.choice_d}
-                  </p>
-                  <p>
-                    Correct index: {question.correct_index} | Difficulty:{' '}
-                    {question.difficulty || 'unknown'} | Active: {question.is_active ? 'Yes' : 'No'}
-                  </p>
-                  <p>Question type: {question.question_type || 'mc_single'}</p>
-                  <p>
-                    Source: {sourceTitlesById[question.source_id] || 'No source'}
-                  </p>
-                  {question.section ? <p>Section: {question.section}</p> : null}
-                  <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleQuestionActive(question)}
-                    disabled={isTogglingQuestionActive}
-                  >
-                    {question.is_active ? 'Deactivate' : 'Reactivate'}
-                  </button>
+                <li key={question.id} className="admin-question-row">
+                  <div className="admin-question-main">
+                    <p className="admin-question-text">{question.question_text}</p>
+                    <div className="admin-question-meta">
+                      <span>
+                        Source: {sourceTitlesById[question.source_id] || 'No source'}
+                      </span>
+                      <span>Section: {question.section || '—'}</span>
+                      <span>Category: {categoryNamesById[question.category_id] || 'Unknown'}</span>
+                      <span>Type: {question.question_type || 'mc_single'}</span>
+                      <span>Difficulty: {question.difficulty || 'unknown'}</span>
+                      <span>Active: {question.is_active ? 'Yes' : 'No'}</span>
+                    </div>
+                  </div>
+                  <div className="admin-question-actions">
+                    <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleQuestionActive(question)}
+                      disabled={isTogglingQuestionActive}
+                    >
+                      {question.is_active ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
