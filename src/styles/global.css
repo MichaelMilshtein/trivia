@@ -77,3 +77,10 @@ body {
 .admin-section h3 {
   margin-top: 0;
 }
+
+.admin-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
