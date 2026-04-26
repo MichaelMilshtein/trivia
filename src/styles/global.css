@@ -61,6 +61,10 @@ body {
   padding: 1.25rem;
 }
 
+.page-container-wide {
+  max-width: 100%;
+}
+
 .admin-page {
   display: flex;
   flex-direction: column;
@@ -125,6 +129,30 @@ body {
 
 .admin-question-table th {
   background: #f8fafc;
+}
+
+.admin-simple-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.admin-simple-table th,
+.admin-simple-table td {
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-simple-table th {
+  background: #f8fafc;
+}
+
+.admin-row-count {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: #334155;
 }
 
 .admin-sort-button {

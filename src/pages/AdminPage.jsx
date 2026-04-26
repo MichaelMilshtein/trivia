@@ -795,6 +795,9 @@ function AdminPage() {
 
       <details className="admin-section" open>
         <summary className="admin-section-summary">Questions List</summary>
+        {listSourceIdFilter && filteredCategoryQuestions.length > 0 ? (
+          <p className="admin-row-count">Rows: {filteredCategoryQuestions.length}</p>
+        ) : null}
         <div className="admin-filters">
           <label htmlFor="list-source-filter">Source</label>
           <select
@@ -1148,22 +1151,37 @@ function AdminPage() {
         {isLoading ? <p>Loading sources...</p> : null}
         {!isLoading && !error ? (
           sources.length > 0 ? (
-            <ul>
-              {sources.map((source) => (
-                <li key={source.id}>
-                  <p>
-                    <strong>{source.title}</strong>
-                  </p>
-                  <p>Source type: {source.source_type || 'N/A'}</p>
-                  <p>Section: {source.section || 'N/A'}</p>
-                  <p>URL: {source.url || 'N/A'}</p>
-                  <p>Active: {source.is_active ? 'Yes' : 'No'}</p>
-                  <button type="button" onClick={() => loadSourceIntoEditForm(source)}>
-                    Edit
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <p className="admin-row-count">Rows: {sources.length}</p>
+              <table className="admin-simple-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Title</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Section</th>
+                    <th scope="col">URL</th>
+                    <th scope="col">Active</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sources.map((source) => (
+                    <tr key={source.id}>
+                      <td>{source.title}</td>
+                      <td>{source.source_type || 'N/A'}</td>
+                      <td>{source.section || 'N/A'}</td>
+                      <td>{source.url || 'N/A'}</td>
+                      <td>{source.is_active ? 'Yes' : 'No'}</td>
+                      <td>
+                        <button type="button" onClick={() => loadSourceIntoEditForm(source)}>
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           ) : (
             <p>No sources found.</p>
           )
@@ -1269,18 +1287,33 @@ function AdminPage() {
 
         {!isLoading && !error ? (
           categories.length > 0 ? (
-            <ul>
-              {categories.map((category) => (
-                <li key={category.id}>
-                  <h4>{category.name}</h4>
-                  <p>{category.description || 'No description'}</p>
-                  <p>Active: {category.is_active ? 'Yes' : 'No'}</p>
-                  <button type="button" onClick={() => loadCategoryIntoEditForm(category)}>
-                    Edit
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <p className="admin-row-count">Rows: {categories.length}</p>
+              <table className="admin-simple-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Active</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categories.map((category) => (
+                    <tr key={category.id}>
+                      <td>{category.name}</td>
+                      <td>{category.description || 'No description'}</td>
+                      <td>{category.is_active ? 'Yes' : 'No'}</td>
+                      <td>
+                        <button type="button" onClick={() => loadCategoryIntoEditForm(category)}>
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           ) : (
             <p>No categories found.</p>
           )
