@@ -30,19 +30,27 @@ function AdminPage() {
   const [categoryUpdateMessage, setCategoryUpdateMessage] = useState('')
   const [categoryUpdateError, setCategoryUpdateError] = useState('')
   const [isUpdatingCategory, setIsUpdatingCategory] = useState(false)
-  const [sourceTitle, setSourceTitle] = useState('')
-  const [sourceType, setSourceType] = useState('')
-  const [sourceSection, setSourceSection] = useState('')
-  const [sourceUrl, setSourceUrl] = useState('')
+  const [sourceShortTitle, setSourceShortTitle] = useState('')
+  const [sourceFullTitle, setSourceFullTitle] = useState('')
+  const [sourceFrontCoverImageUrl, setSourceFrontCoverImageUrl] = useState('')
+  const [sourceBackCoverImageUrl, setSourceBackCoverImageUrl] = useState('')
+  const [sourceDescription, setSourceDescription] = useState('')
+  const [sourceStoreUrl, setSourceStoreUrl] = useState('')
+  const [sourceAuthor, setSourceAuthor] = useState('')
+  const [sourceDisplayOrder, setSourceDisplayOrder] = useState('0')
   const [sourceIsActive, setSourceIsActive] = useState(true)
   const [sourceSubmitMessage, setSourceSubmitMessage] = useState('')
   const [sourceSubmitError, setSourceSubmitError] = useState('')
   const [isSubmittingSource, setIsSubmittingSource] = useState(false)
   const [editingSourceId, setEditingSourceId] = useState('')
-  const [editSourceTitle, setEditSourceTitle] = useState('')
-  const [editSourceType, setEditSourceType] = useState('')
-  const [editSourceSection, setEditSourceSection] = useState('')
-  const [editSourceUrl, setEditSourceUrl] = useState('')
+  const [editSourceShortTitle, setEditSourceShortTitle] = useState('')
+  const [editSourceFullTitle, setEditSourceFullTitle] = useState('')
+  const [editSourceFrontCoverImageUrl, setEditSourceFrontCoverImageUrl] = useState('')
+  const [editSourceBackCoverImageUrl, setEditSourceBackCoverImageUrl] = useState('')
+  const [editSourceDescription, setEditSourceDescription] = useState('')
+  const [editSourceStoreUrl, setEditSourceStoreUrl] = useState('')
+  const [editSourceAuthor, setEditSourceAuthor] = useState('')
+  const [editSourceDisplayOrder, setEditSourceDisplayOrder] = useState('0')
   const [editSourceIsActive, setEditSourceIsActive] = useState(true)
   const [sourceUpdateMessage, setSourceUpdateMessage] = useState('')
   const [sourceUpdateError, setSourceUpdateError] = useState('')
@@ -83,10 +91,10 @@ function AdminPage() {
   const [questionSortField, setQuestionSortField] = useState(QUESTION_SORT_FIELDS.source)
   const [questionSortDirection, setQuestionSortDirection] = useState('asc')
 
-  const sourceTitlesById = useMemo(
+  const sourceShortTitlesById = useMemo(
     () =>
       sources.reduce((accumulator, source) => {
-        accumulator[source.id] = source.title
+        accumulator[source.id] = source.short_title
         return accumulator
       }, {}),
     [sources]
@@ -101,12 +109,12 @@ function AdminPage() {
     [categories]
   )
 
-  const sourcesByNormalizedTitle = useMemo(
+  const sourcesByNormalizedShortTitle = useMemo(
     () =>
       sources.reduce((accumulator, source) => {
-        const normalizedTitle = (source.title || '').trim().toLowerCase()
-        if (normalizedTitle) {
-          accumulator[normalizedTitle] = source
+        const normalizedShortTitle = (source.short_title || '').trim().toLowerCase()
+        if (normalizedShortTitle) {
+          accumulator[normalizedShortTitle] = source
         }
         return accumulator
       }, {}),
@@ -155,7 +163,7 @@ function AdminPage() {
     return [...filteredQuestions].sort((questionA, questionB) => {
       function getSortValue(question) {
         if (questionSortField === QUESTION_SORT_FIELDS.source) {
-          return (sourceTitlesById[question.source_id] || 'No source').toLowerCase()
+          return (sourceShortTitlesById[question.source_id] || 'No source').toLowerCase()
         }
 
         if (questionSortField === QUESTION_SORT_FIELDS.section) {
@@ -196,7 +204,7 @@ function AdminPage() {
     listActiveFilter,
     listSectionSearch,
     listQuestionTypeFilter,
-    sourceTitlesById,
+    sourceShortTitlesById,
     categoryNamesById,
     questionSortField,
     questionSortDirection
@@ -242,10 +250,22 @@ function AdminPage() {
 
   async function loadSources() {
     const rows = await selectFrom('sources', {
-      columns: 'id,title,source_type,section,url,is_active'
+      columns:
+        'id,short_title,full_title,front_cover_image_url,back_cover_image_url,description,store_url,author,display_order,is_active'
     })
 
-    setSources(rows)
+    const sortedRows = [...rows].sort((sourceA, sourceB) => {
+      const displayOrderA = Number(sourceA.display_order ?? 0)
+      const displayOrderB = Number(sourceB.display_order ?? 0)
+
+      if (displayOrderA !== displayOrderB) {
+        return displayOrderA - displayOrderB
+      }
+
+      return (sourceA.short_title || '').localeCompare(sourceB.short_title || '')
+    })
+
+    setSources(sortedRows)
   }
 
   async function fetchCategoryQuestions(sourceId, categoryId = '') {
@@ -307,10 +327,14 @@ function AdminPage() {
 
   function loadSourceIntoEditForm(source) {
     setEditingSourceId(source.id)
-    setEditSourceTitle(source.title || '')
-    setEditSourceType(source.source_type || '')
-    setEditSourceSection(source.section || '')
-    setEditSourceUrl(source.url || '')
+    setEditSourceShortTitle(source.short_title || '')
+    setEditSourceFullTitle(source.full_title || '')
+    setEditSourceFrontCoverImageUrl(source.front_cover_image_url || '')
+    setEditSourceBackCoverImageUrl(source.back_cover_image_url || '')
+    setEditSourceDescription(source.description || '')
+    setEditSourceStoreUrl(source.store_url || '')
+    setEditSourceAuthor(source.author || '')
+    setEditSourceDisplayOrder(String(source.display_order ?? 0))
     setEditSourceIsActive(Boolean(source.is_active))
     setSourceUpdateMessage('')
     setSourceUpdateError('')
@@ -455,9 +479,9 @@ function AdminPage() {
       let resolvedSourceId = fallbackSourceId
 
       if (jsonSourceTitle) {
-        const matchedSource = sourcesByNormalizedTitle[jsonSourceTitle.toLowerCase()]
+        const matchedSource = sourcesByNormalizedShortTitle[jsonSourceTitle.toLowerCase()]
         if (!matchedSource) {
-          throw new Error(`No source found with title "${jsonSourceTitle}".`)
+          throw new Error(`No source found with short title "${jsonSourceTitle}".`)
         }
         resolvedSourceId = matchedSource.id
       }
@@ -612,19 +636,32 @@ function AdminPage() {
     setIsSubmittingSource(true)
 
     try {
+      const parsedDisplayOrder = Number(sourceDisplayOrder)
+      if (!Number.isInteger(parsedDisplayOrder)) {
+        throw new Error('Display order must be an integer.')
+      }
+
       await insertInto('sources', {
-        title: sourceTitle.trim(),
-        source_type: sourceType.trim(),
-        section: sourceSection.trim(),
-        url: sourceUrl.trim(),
+        short_title: sourceShortTitle.trim(),
+        full_title: sourceFullTitle.trim() || null,
+        front_cover_image_url: sourceFrontCoverImageUrl.trim() || null,
+        back_cover_image_url: sourceBackCoverImageUrl.trim() || null,
+        description: sourceDescription.trim() || null,
+        store_url: sourceStoreUrl.trim() || null,
+        author: sourceAuthor.trim() || null,
+        display_order: parsedDisplayOrder,
         is_active: sourceIsActive
       })
 
       setSourceSubmitMessage('Source created successfully.')
-      setSourceTitle('')
-      setSourceType('')
-      setSourceSection('')
-      setSourceUrl('')
+      setSourceShortTitle('')
+      setSourceFullTitle('')
+      setSourceFrontCoverImageUrl('')
+      setSourceBackCoverImageUrl('')
+      setSourceDescription('')
+      setSourceStoreUrl('')
+      setSourceAuthor('')
+      setSourceDisplayOrder('0')
       setSourceIsActive(true)
       await loadSources()
     } catch (err) {
@@ -644,16 +681,27 @@ function AdminPage() {
       return
     }
 
+    const parsedDisplayOrder = Number(editSourceDisplayOrder)
+
+    if (!Number.isInteger(parsedDisplayOrder)) {
+      setSourceUpdateError('Display order must be an integer.')
+      return
+    }
+
     setIsUpdatingSource(true)
 
     try {
       await updateRows(
         'sources',
         {
-          title: editSourceTitle.trim(),
-          source_type: editSourceType.trim(),
-          section: editSourceSection.trim() || null,
-          url: editSourceUrl.trim() || null,
+          short_title: editSourceShortTitle.trim(),
+          full_title: editSourceFullTitle.trim() || null,
+          front_cover_image_url: editSourceFrontCoverImageUrl.trim() || null,
+          back_cover_image_url: editSourceBackCoverImageUrl.trim() || null,
+          description: editSourceDescription.trim() || null,
+          store_url: editSourceStoreUrl.trim() || null,
+          author: editSourceAuthor.trim() || null,
+          display_order: parsedDisplayOrder,
           is_active: editSourceIsActive
         },
         { id: `eq.${editingSourceId}` }
@@ -746,7 +794,7 @@ function AdminPage() {
             <option value="">No source</option>
             {sources.map((source) => (
               <option key={source.id} value={source.id}>
-                {source.title}
+                {source.short_title}
               </option>
             ))}
           </select>
@@ -810,7 +858,7 @@ function AdminPage() {
             <option value="">Choose a source</option>
             {sources.map((source) => (
               <option key={source.id} value={source.id}>
-                {source.title}
+                {source.short_title}
               </option>
             ))}
           </select>
@@ -931,7 +979,7 @@ function AdminPage() {
                     <td title={question.question_text || ''} className="admin-question-cell-preview">
                       {getQuestionPreview(question.question_text) || '—'}
                     </td>
-                    <td>{sourceTitlesById[question.source_id] || 'No source'}</td>
+                    <td>{sourceShortTitlesById[question.source_id] || 'No source'}</td>
                     <td>{question.section || '—'}</td>
                     <td>{categoryNamesById[question.category_id] || 'Unknown'}</td>
                     <td>{question.question_type || 'mc_single'}</td>
@@ -1073,7 +1121,7 @@ function AdminPage() {
             <option value="">No source</option>
             {sources.map((source) => (
               <option key={source.id} value={source.id}>
-                {source.title}
+                {source.short_title}
               </option>
             ))}
           </select>
@@ -1088,46 +1136,79 @@ function AdminPage() {
       </details>
 
       <details className="admin-section">
-        <summary className="admin-section-summary">Sources</summary>
+        <summary className="admin-section-summary">Book Sources</summary>
         <form onSubmit={handleCreateSource}>
-          <label htmlFor="source-title">Title</label>
+          <label htmlFor="source-short-title">Short title</label>
           <input
-            id="source-title"
-            name="title"
+            id="source-short-title"
+            name="short_title"
             type="text"
-            value={sourceTitle}
-            onChange={(event) => setSourceTitle(event.target.value)}
+            value={sourceShortTitle}
+            onChange={(event) => setSourceShortTitle(event.target.value)}
             required
           />
 
-          <label htmlFor="source-type">Source type</label>
+          <label htmlFor="source-full-title">Full title</label>
           <input
-            id="source-type"
-            name="source_type"
+            id="source-full-title"
+            name="full_title"
             type="text"
-            value={sourceType}
-            onChange={(event) => setSourceType(event.target.value)}
+            value={sourceFullTitle}
+            onChange={(event) => setSourceFullTitle(event.target.value)}
+          />
+
+          <label htmlFor="source-author">Author</label>
+          <input
+            id="source-author"
+            name="author"
+            type="text"
+            value={sourceAuthor}
+            onChange={(event) => setSourceAuthor(event.target.value)}
+          />
+
+          <label htmlFor="source-display-order">Display order</label>
+          <input
+            id="source-display-order"
+            name="display_order"
+            type="number"
+            value={sourceDisplayOrder}
+            onChange={(event) => setSourceDisplayOrder(event.target.value)}
             required
           />
 
-          <label htmlFor="source-section">Section</label>
+          <label htmlFor="source-front-cover-image-url">Front cover image URL/path</label>
           <input
-            id="source-section"
-            name="section"
+            id="source-front-cover-image-url"
+            name="front_cover_image_url"
             type="text"
-            value={sourceSection}
-            onChange={(event) => setSourceSection(event.target.value)}
-            required
+            value={sourceFrontCoverImageUrl}
+            onChange={(event) => setSourceFrontCoverImageUrl(event.target.value)}
           />
 
-          <label htmlFor="source-url">URL</label>
+          <label htmlFor="source-back-cover-image-url">Back cover image URL/path</label>
           <input
-            id="source-url"
-            name="url"
+            id="source-back-cover-image-url"
+            name="back_cover_image_url"
+            type="text"
+            value={sourceBackCoverImageUrl}
+            onChange={(event) => setSourceBackCoverImageUrl(event.target.value)}
+          />
+
+          <label htmlFor="source-store-url">Store URL</label>
+          <input
+            id="source-store-url"
+            name="store_url"
             type="url"
-            value={sourceUrl}
-            onChange={(event) => setSourceUrl(event.target.value)}
-            required
+            value={sourceStoreUrl}
+            onChange={(event) => setSourceStoreUrl(event.target.value)}
+          />
+
+          <label htmlFor="source-description">Description</label>
+          <textarea
+            id="source-description"
+            name="description"
+            value={sourceDescription}
+            onChange={(event) => setSourceDescription(event.target.value)}
           />
 
           <label htmlFor="source-active">Is active</label>
@@ -1140,7 +1221,7 @@ function AdminPage() {
           />
 
           <button type="submit" disabled={isSubmittingSource}>
-            {isSubmittingSource ? 'Creating...' : 'Create source'}
+            {isSubmittingSource ? 'Creating...' : 'Create book source'}
           </button>
         </form>
 
@@ -1156,10 +1237,10 @@ function AdminPage() {
               <table className="admin-simple-table">
                 <thead>
                   <tr>
-                    <th scope="col">Title</th>
-                    <th scope="col">Type</th>
-                    <th scope="col">Section</th>
-                    <th scope="col">URL</th>
+                    <th scope="col">Short title</th>
+                    <th scope="col">Full title</th>
+                    <th scope="col">Author</th>
+                    <th scope="col">Display order</th>
                     <th scope="col">Active</th>
                     <th scope="col">Actions</th>
                   </tr>
@@ -1167,10 +1248,10 @@ function AdminPage() {
                 <tbody>
                   {sources.map((source) => (
                     <tr key={source.id}>
-                      <td>{source.title}</td>
-                      <td>{source.source_type || 'N/A'}</td>
-                      <td>{source.section || 'N/A'}</td>
-                      <td>{source.url || 'N/A'}</td>
+                      <td>{source.short_title}</td>
+                      <td>{source.full_title || 'N/A'}</td>
+                      <td>{source.author || 'N/A'}</td>
+                      <td>{source.display_order ?? 0}</td>
                       <td>{source.is_active ? 'Yes' : 'No'}</td>
                       <td>
                         <button type="button" onClick={() => loadSourceIntoEditForm(source)}>
@@ -1187,45 +1268,80 @@ function AdminPage() {
           )
         ) : null}
 
-        <h4>Source Editor</h4>
+        <h4>Book Source Editor</h4>
         {!editingSourceId ? <p>Click Edit on a source to load it into this form.</p> : null}
         <form onSubmit={handleUpdateSource}>
-          <label htmlFor="edit-source-title">Title</label>
+          <label htmlFor="edit-source-short-title">Short title</label>
           <input
-            id="edit-source-title"
-            name="edit_title"
+            id="edit-source-short-title"
+            name="edit_short_title"
             type="text"
-            value={editSourceTitle}
-            onChange={(event) => setEditSourceTitle(event.target.value)}
+            value={editSourceShortTitle}
+            onChange={(event) => setEditSourceShortTitle(event.target.value)}
             required
           />
 
-          <label htmlFor="edit-source-type">Source type</label>
+          <label htmlFor="edit-source-full-title">Full title</label>
           <input
-            id="edit-source-type"
-            name="edit_source_type"
+            id="edit-source-full-title"
+            name="edit_full_title"
             type="text"
-            value={editSourceType}
-            onChange={(event) => setEditSourceType(event.target.value)}
+            value={editSourceFullTitle}
+            onChange={(event) => setEditSourceFullTitle(event.target.value)}
+          />
+
+          <label htmlFor="edit-source-author">Author</label>
+          <input
+            id="edit-source-author"
+            name="edit_author"
+            type="text"
+            value={editSourceAuthor}
+            onChange={(event) => setEditSourceAuthor(event.target.value)}
+          />
+
+          <label htmlFor="edit-source-display-order">Display order</label>
+          <input
+            id="edit-source-display-order"
+            name="edit_display_order"
+            type="number"
+            value={editSourceDisplayOrder}
+            onChange={(event) => setEditSourceDisplayOrder(event.target.value)}
             required
           />
 
-          <label htmlFor="edit-source-section">Section</label>
+          <label htmlFor="edit-source-front-cover-image-url">Front cover image URL/path</label>
           <input
-            id="edit-source-section"
-            name="edit_section"
+            id="edit-source-front-cover-image-url"
+            name="edit_front_cover_image_url"
             type="text"
-            value={editSourceSection}
-            onChange={(event) => setEditSourceSection(event.target.value)}
+            value={editSourceFrontCoverImageUrl}
+            onChange={(event) => setEditSourceFrontCoverImageUrl(event.target.value)}
           />
 
-          <label htmlFor="edit-source-url">URL</label>
+          <label htmlFor="edit-source-back-cover-image-url">Back cover image URL/path</label>
           <input
-            id="edit-source-url"
-            name="edit_url"
+            id="edit-source-back-cover-image-url"
+            name="edit_back_cover_image_url"
+            type="text"
+            value={editSourceBackCoverImageUrl}
+            onChange={(event) => setEditSourceBackCoverImageUrl(event.target.value)}
+          />
+
+          <label htmlFor="edit-source-store-url">Store URL</label>
+          <input
+            id="edit-source-store-url"
+            name="edit_store_url"
             type="url"
-            value={editSourceUrl}
-            onChange={(event) => setEditSourceUrl(event.target.value)}
+            value={editSourceStoreUrl}
+            onChange={(event) => setEditSourceStoreUrl(event.target.value)}
+          />
+
+          <label htmlFor="edit-source-description">Description</label>
+          <textarea
+            id="edit-source-description"
+            name="edit_description"
+            value={editSourceDescription}
+            onChange={(event) => setEditSourceDescription(event.target.value)}
           />
 
           <label htmlFor="edit-source-active">Is active</label>
@@ -1238,7 +1354,7 @@ function AdminPage() {
           />
 
           <button type="submit" disabled={!editingSourceId || isUpdatingSource}>
-            {isUpdatingSource ? 'Saving...' : 'Save source changes'}
+            {isUpdatingSource ? 'Saving...' : 'Save book source changes'}
           </button>
         </form>
       </details>
