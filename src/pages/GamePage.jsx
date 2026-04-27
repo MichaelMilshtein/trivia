@@ -32,13 +32,24 @@ function GamePage() {
 
       try {
         const rows = await selectFrom('sources', {
-          columns: 'id,title',
+          columns: 'id,short_title,display_order',
           filters: {
             is_active: 'eq.true'
           }
         })
 
-        setSources(rows)
+        const sortedRows = [...rows].sort((sourceA, sourceB) => {
+          const displayOrderA = Number(sourceA.display_order ?? 0)
+          const displayOrderB = Number(sourceB.display_order ?? 0)
+
+          if (displayOrderA !== displayOrderB) {
+            return displayOrderA - displayOrderB
+          }
+
+          return (sourceA.short_title || '').localeCompare(sourceB.short_title || '')
+        })
+
+        setSources(sortedRows)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load sources.')
       } finally {
@@ -162,7 +173,7 @@ function GamePage() {
                 <option value="">Select a source</option>
                 {sources.map((source) => (
                   <option key={source.id} value={source.id}>
-                    {source.title}
+                    {source.short_title}
                   </option>
                 ))}
               </select>
