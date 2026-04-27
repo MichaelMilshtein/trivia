@@ -4,6 +4,7 @@ import { insertInto, selectFrom, updateRows } from '../lib/supabaseClient'
 const QUESTION_COLUMNS =
   'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,is_active,source_id,category_id,section'
 const QUESTION_PREVIEW_LENGTH = 80
+const SOURCE_DESCRIPTION_PREVIEW_LENGTH = 120
 const QUESTION_SORT_FIELDS = {
   source: 'source',
   section: 'section',
@@ -236,6 +237,32 @@ function AdminPage() {
     }
 
     return `${trimmedText.slice(0, QUESTION_PREVIEW_LENGTH)}…`
+  }
+
+  function getSourceDescriptionPreview(descriptionText) {
+    const trimmedText = (descriptionText || '').trim()
+
+    if (!trimmedText) {
+      return 'N/A'
+    }
+
+    if (trimmedText.length <= SOURCE_DESCRIPTION_PREVIEW_LENGTH) {
+      return trimmedText
+    }
+
+    return `${trimmedText.slice(0, SOURCE_DESCRIPTION_PREVIEW_LENGTH)}…`
+  }
+
+  function renderSourceLink(url, label) {
+    if (!url) {
+      return <span className="admin-source-meta-empty">{label}: —</span>
+    }
+
+    return (
+      <a href={url} target="_blank" rel="noreferrer">
+        {label}
+      </a>
+    )
   }
 
   async function loadCategories() {
@@ -1240,6 +1267,8 @@ function AdminPage() {
                     <th scope="col">Short title</th>
                     <th scope="col">Full title</th>
                     <th scope="col">Author</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Metadata</th>
                     <th scope="col">Display order</th>
                     <th scope="col">Active</th>
                     <th scope="col">Actions</th>
@@ -1251,6 +1280,16 @@ function AdminPage() {
                       <td>{source.short_title}</td>
                       <td>{source.full_title || 'N/A'}</td>
                       <td>{source.author || 'N/A'}</td>
+                      <td title={source.description || ''}>
+                        {getSourceDescriptionPreview(source.description)}
+                      </td>
+                      <td>
+                        <div className="admin-source-meta-list">
+                          {renderSourceLink(source.front_cover_image_url, 'Front cover')}
+                          {renderSourceLink(source.back_cover_image_url, 'Back cover')}
+                          {renderSourceLink(source.store_url, 'Store')}
+                        </div>
+                      </td>
                       <td>{source.display_order ?? 0}</td>
                       <td>{source.is_active ? 'Yes' : 'No'}</td>
                       <td>

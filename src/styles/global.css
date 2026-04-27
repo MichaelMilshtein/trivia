@@ -178,3 +178,14 @@ body {
   gap: 0.4rem;
   flex-wrap: wrap;
 }
+
+.admin-source-meta-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
+
+.admin-source-meta-empty {
+  color: #64748b;
+}
