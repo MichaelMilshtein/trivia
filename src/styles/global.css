@@ -189,3 +189,23 @@ body {
 .admin-source-meta-empty {
   color: #64748b;
 }
+
+.admin-source-cover-thumbnail {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.admin-source-cover-label {
+  min-width: 5.5rem;
+  color: #334155;
+}
+
+.admin-source-cover-thumbnail img {
+  height: 100px;
+  width: auto;
+  object-fit: contain;
+  border: 1px solid #e2e8f0;
+  border-radius: 2px;
+  background: #f8fafc;
+}
