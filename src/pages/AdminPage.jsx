@@ -253,13 +253,13 @@ function AdminPage() {
     return `${trimmedText.slice(0, SOURCE_DESCRIPTION_PREVIEW_LENGTH)}…`
   }
 
-  function renderSourceLink(url, label) {
-    if (!url) {
+  function renderSourceLink(linkUrl, label) {
+    if (!linkUrl) {
       return <span className="admin-source-meta-empty">{label}: —</span>
     }
 
     return (
-      <a href={url} target="_blank" rel="noreferrer">
+      <a href={linkUrl} target="_blank" rel="noreferrer">
         {label}
       </a>
     )
