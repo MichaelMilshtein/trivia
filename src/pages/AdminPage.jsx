@@ -83,6 +83,7 @@ function AdminPage() {
   const [editIsActive, setEditIsActive] = useState(true)
   const [editSection, setEditSection] = useState('')
   const [editSourceId, setEditSourceId] = useState('')
+  const [editCategoryId, setEditCategoryId] = useState('')
   const [isUpdatingQuestion, setIsUpdatingQuestion] = useState(false)
   const [questionUpdateMessage, setQuestionUpdateMessage] = useState('')
   const [questionUpdateError, setQuestionUpdateError] = useState('')
@@ -91,6 +92,11 @@ function AdminPage() {
   const [questionActiveError, setQuestionActiveError] = useState('')
   const [questionSortField, setQuestionSortField] = useState(QUESTION_SORT_FIELDS.source)
   const [questionSortDirection, setQuestionSortDirection] = useState('asc')
+  const [questionSearchInput, setQuestionSearchInput] = useState('')
+  const [debouncedQuestionSearch, setDebouncedQuestionSearch] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [isSearchingQuestions, setIsSearchingQuestions] = useState(false)
+  const [searchQuestionsError, setSearchQuestionsError] = useState('')
 
   const sourceShortTitlesById = useMemo(
     () =>
@@ -346,6 +352,7 @@ function AdminPage() {
     setEditIsActive(true)
     setEditSection('')
     setEditSourceId('')
+    setEditCategoryId('')
   }
 
   function loadQuestionIntoEditForm(question) {
@@ -361,6 +368,7 @@ function AdminPage() {
     setEditIsActive(Boolean(question.is_active))
     setEditSection(question.section || '')
     setEditSourceId(question.source_id || '')
+    setEditCategoryId(question.category_id || '')
     setQuestionUpdateMessage('')
     setQuestionUpdateError('')
   }
@@ -388,6 +396,45 @@ function AdminPage() {
     setCategoryUpdateMessage('')
     setCategoryUpdateError('')
   }
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedQuestionSearch(questionSearchInput.trim())
+    }, 300)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [questionSearchInput])
+
+  useEffect(() => {
+    async function searchQuestions() {
+      if (debouncedQuestionSearch.length < 2) {
+        setSearchResults([])
+        setSearchQuestionsError('')
+        return
+      }
+
+      setIsSearchingQuestions(true)
+      setSearchQuestionsError('')
+
+      try {
+        const rows = await selectFrom('questions', {
+          columns: QUESTION_COLUMNS,
+          filters: {
+            question_text: `ilike.*${debouncedQuestionSearch}*`,
+            order: 'id.desc',
+            limit: '25'
+          }
+        })
+        setSearchResults(rows)
+      } catch (err) {
+        setSearchQuestionsError(err instanceof Error ? err.message : 'Failed to search questions.')
+      } finally {
+        setIsSearchingQuestions(false)
+      }
+    }
+
+    searchQuestions()
+  }, [debouncedQuestionSearch])
 
   useEffect(() => {
     async function initializeCategories() {
@@ -655,12 +702,24 @@ function AdminPage() {
           difficulty: editDifficulty.trim() || null,
           is_active: editIsActive,
           section: editSection.trim() || null,
-          source_id: editSourceId || null
+          source_id: editSourceId || null,
+          category_id: editCategoryId || null
         },
         { id: `eq.${editingQuestionId}` }
       )
 
       setQuestionUpdateMessage('Question updated successfully.')
+      if (debouncedQuestionSearch.length >= 2) {
+        const rows = await selectFrom('questions', {
+          columns: QUESTION_COLUMNS,
+          filters: {
+            question_text: `ilike.*${debouncedQuestionSearch}*`,
+            order: 'id.desc',
+            limit: '25'
+          }
+        })
+        setSearchResults(rows)
+      }
       await refreshCategoryQuestions()
     } catch (err) {
       setQuestionUpdateError(err instanceof Error ? err.message : 'Failed to update question.')
@@ -958,6 +1017,99 @@ function AdminPage() {
         {questionActiveMessage ? <p>{questionActiveMessage}</p> : null}
         {questionActiveError ? <p>{questionActiveError}</p> : null}
 
+        <div className="admin-inline-grid">
+          <label htmlFor="find-question-search">Find question</label>
+          <input
+            id="find-question-search"
+            name="find_question_search"
+            type="text"
+            value={questionSearchInput}
+            onChange={(event) => setQuestionSearchInput(event.target.value)}
+            placeholder="Type at least 2 characters"
+          />
+        </div>
+        {questionSearchInput.trim().length < 2 ? <p>Type at least 2 characters to search.</p> : null}
+        {isSearchingQuestions ? <p>Searching questions...</p> : null}
+        {searchQuestionsError ? <p>{searchQuestionsError}</p> : null}
+        {questionSearchInput.trim().length >= 2 && !isSearchingQuestions && !searchQuestionsError ? (
+          searchResults.length > 0 ? (
+            <table className="admin-question-table">
+              <thead>
+                <tr>
+                  <th scope="col">Question</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Section</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">Active</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {searchResults.map((question) => (
+                  <tr key={`search-${question.id}`}>
+                    <td title={question.question_text || ''} className="admin-question-cell-preview">
+                      {getQuestionPreview(question.question_text) || '—'}
+                    </td>
+                    <td>{sourceShortTitlesById[question.source_id] || '—'}</td>
+                    <td>{question.section || '—'}</td>
+                    <td>{categoryNamesById[question.category_id] || '—'}</td>
+                    <td>{question.is_active ? 'Active' : 'Inactive'}</td>
+                    <td>
+                      <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p>No matching questions found.</p>
+          )
+        ) : null}
+
+        <h3>Question editor</h3>
+        {!editingQuestionId ? <p>Click Edit from search results to load a question.</p> : null}
+        <form onSubmit={handleUpdateQuestion}>
+          <label htmlFor="edit-question-text">Question text</label>
+          <textarea id="edit-question-text" name="question_text" value={editQuestionText} onChange={(event) => setEditQuestionText(event.target.value)} required />
+          <label htmlFor="edit-choice-a">Choice A</label>
+          <input id="edit-choice-a" name="choice_a" type="text" value={editChoiceA} onChange={(event) => setEditChoiceA(event.target.value)} required />
+          <label htmlFor="edit-choice-b">Choice B</label>
+          <input id="edit-choice-b" name="choice_b" type="text" value={editChoiceB} onChange={(event) => setEditChoiceB(event.target.value)} required />
+          <label htmlFor="edit-choice-c">Choice C</label>
+          <input id="edit-choice-c" name="choice_c" type="text" value={editChoiceC} onChange={(event) => setEditChoiceC(event.target.value)} required />
+          <label htmlFor="edit-choice-d">Choice D</label>
+          <input id="edit-choice-d" name="choice_d" type="text" value={editChoiceD} onChange={(event) => setEditChoiceD(event.target.value)} required />
+          <label htmlFor="edit-correct-index">Correct index</label>
+          <input id="edit-correct-index" name="correct_index" type="number" min={0} max={3} value={editCorrectIndex} onChange={(event) => setEditCorrectIndex(event.target.value)} required />
+          <label htmlFor="edit-difficulty">Difficulty</label>
+          <input id="edit-difficulty" name="difficulty" type="text" value={editDifficulty} onChange={(event) => setEditDifficulty(event.target.value)} />
+          <label htmlFor="edit-question-type">Question type</label>
+          <select id="edit-question-type" name="question_type" value={editQuestionType} onChange={(event) => setEditQuestionType(event.target.value)}>
+            <option value="mc_single">mc_single</option>
+          </select>
+          <label htmlFor="edit-category">Category</label>
+          <select id="edit-category" name="category_id" value={editCategoryId} onChange={(event) => setEditCategoryId(event.target.value)}>
+            <option value="">No category</option>
+            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </select>
+          <label htmlFor="edit-source">Source</label>
+          <select id="edit-source" name="source_id" value={editSourceId} onChange={(event) => setEditSourceId(event.target.value)}>
+            <option value="">No source</option>
+            {sources.map((source) => <option key={source.id} value={source.id}>{source.short_title}</option>)}
+          </select>
+          <label htmlFor="edit-section">Section</label>
+          <input id="edit-section" name="section" type="text" value={editSection} onChange={(event) => setEditSection(event.target.value)} />
+          <label htmlFor="edit-active">Is active</label>
+          <input id="edit-active" name="is_active" type="checkbox" checked={editIsActive} onChange={(event) => setEditIsActive(event.target.checked)} />
+          <button type="submit" disabled={!editingQuestionId || isUpdatingQuestion}>
+            {isUpdatingQuestion ? 'Saving...' : 'Save question changes'}
+          </button>
+        </form>
+        {questionUpdateMessage ? <p>{questionUpdateMessage}</p> : null}
+        {questionUpdateError ? <p>{questionUpdateError}</p> : null}
+
         {listSourceIdFilter && !isLoadingQuestions && !questionsError ? (
           filteredCategoryQuestions.length > 0 ? (
             <table className="admin-question-table">
@@ -1047,132 +1199,6 @@ function AdminPage() {
             <p>No questions found for the current filters.</p>
           )
         ) : null}
-      </details>
-
-      <details className="admin-section">
-        <summary className="admin-section-summary">Question Editor</summary>
-        {!editingQuestionId ? <p>Click Edit on a question to load it into this form.</p> : null}
-        <form onSubmit={handleUpdateQuestion}>
-          <label htmlFor="edit-question-text">Question text</label>
-          <textarea
-            id="edit-question-text"
-            name="question_text"
-            value={editQuestionText}
-            onChange={(event) => setEditQuestionText(event.target.value)}
-            required
-          />
-
-          <label htmlFor="edit-choice-a">Choice A</label>
-          <input
-            id="edit-choice-a"
-            name="choice_a"
-            type="text"
-            value={editChoiceA}
-            onChange={(event) => setEditChoiceA(event.target.value)}
-            required
-          />
-
-          <label htmlFor="edit-choice-b">Choice B</label>
-          <input
-            id="edit-choice-b"
-            name="choice_b"
-            type="text"
-            value={editChoiceB}
-            onChange={(event) => setEditChoiceB(event.target.value)}
-            required
-          />
-
-          <label htmlFor="edit-choice-c">Choice C</label>
-          <input
-            id="edit-choice-c"
-            name="choice_c"
-            type="text"
-            value={editChoiceC}
-            onChange={(event) => setEditChoiceC(event.target.value)}
-            required
-          />
-
-          <label htmlFor="edit-choice-d">Choice D</label>
-          <input
-            id="edit-choice-d"
-            name="choice_d"
-            type="text"
-            value={editChoiceD}
-            onChange={(event) => setEditChoiceD(event.target.value)}
-            required
-          />
-
-          <label htmlFor="edit-correct-index">Correct index</label>
-          <input
-            id="edit-correct-index"
-            name="correct_index"
-            type="number"
-            min={0}
-            max={3}
-            value={editCorrectIndex}
-            onChange={(event) => setEditCorrectIndex(event.target.value)}
-            required
-          />
-
-          <label htmlFor="edit-difficulty">Difficulty</label>
-          <input
-            id="edit-difficulty"
-            name="difficulty"
-            type="text"
-            value={editDifficulty}
-            onChange={(event) => setEditDifficulty(event.target.value)}
-          />
-
-          <label htmlFor="edit-question-type">Question type</label>
-          <select
-            id="edit-question-type"
-            name="question_type"
-            value={editQuestionType}
-            onChange={(event) => setEditQuestionType(event.target.value)}
-          >
-            <option value="mc_single">mc_single</option>
-          </select>
-
-          <label htmlFor="edit-active">Is active</label>
-          <input
-            id="edit-active"
-            name="is_active"
-            type="checkbox"
-            checked={editIsActive}
-            onChange={(event) => setEditIsActive(event.target.checked)}
-          />
-
-          <label htmlFor="edit-section">Section</label>
-          <input
-            id="edit-section"
-            name="section"
-            type="text"
-            value={editSection}
-            onChange={(event) => setEditSection(event.target.value)}
-          />
-
-          <label htmlFor="edit-source">Source</label>
-          <select
-            id="edit-source"
-            name="source_id"
-            value={editSourceId}
-            onChange={(event) => setEditSourceId(event.target.value)}
-          >
-            <option value="">No source</option>
-            {sources.map((source) => (
-              <option key={source.id} value={source.id}>
-                {source.short_title}
-              </option>
-            ))}
-          </select>
-
-          <button type="submit" disabled={!editingQuestionId || isUpdatingQuestion}>
-            {isUpdatingQuestion ? 'Saving...' : 'Save question changes'}
-          </button>
-        </form>
-
-        {questionUpdateMessage ? <p>{questionUpdateMessage}</p> : null}
-        {questionUpdateError ? <p>{questionUpdateError}</p> : null}
       </details>
 
       <details className="admin-section">
