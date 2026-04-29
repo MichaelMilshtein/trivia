@@ -265,6 +265,19 @@ function AdminPage() {
     )
   }
 
+  function renderSourceCoverThumbnail(imagePath, label) {
+    if (!imagePath) {
+      return <span className="admin-source-meta-empty">{label}: No image</span>
+    }
+
+    return (
+      <div className="admin-source-cover-thumbnail">
+        <span className="admin-source-cover-label">{label}</span>
+        <img src={imagePath} alt={`${label} thumbnail`} loading="lazy" />
+      </div>
+    )
+  }
+
   async function loadCategories() {
     setError('')
 
@@ -1285,6 +1298,8 @@ function AdminPage() {
                       </td>
                       <td>
                         <div className="admin-source-meta-list">
+                          {renderSourceCoverThumbnail(source.front_cover_image_url, 'Front cover')}
+                          {renderSourceCoverThumbnail(source.back_cover_image_url, 'Back cover')}
                           {renderSourceLink(source.front_cover_image_url, 'Front cover')}
                           {renderSourceLink(source.back_cover_image_url, 'Back cover')}
                           {renderSourceLink(source.store_url, 'Store')}
