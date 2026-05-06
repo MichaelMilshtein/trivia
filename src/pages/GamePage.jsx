@@ -1,6 +1,29 @@
 import { useEffect, useMemo, useState } from 'react'
 import { selectFrom } from '../lib/supabaseClient'
 
+const GAME_MODES = {
+  sprint: {
+    id: 'sprint',
+    name: '60-Second Sprint',
+    shortName: 'Sprint',
+    tagline: 'Race the clock',
+    description: 'You have 60 seconds to answer as many questions as possible.',
+    statusLabel: 'Timer'
+  },
+  lives: {
+    id: 'lives',
+    name: 'Three Lives Challenge',
+    shortName: 'Three Lives',
+    tagline: 'Protect your streak',
+    description: 'No timer. Your third wrong answer ends the game.',
+    statusLabel: 'Lives'
+  }
+}
+
+const SPRINT_SECONDS = 60
+const MAX_MISTAKES_IN_LIVES_MODE = 2
+const CHOICE_KEYS = ['A', 'B', 'C', 'D']
+
 function shuffleItems(items) {
   const shuffled = [...items]
 
@@ -14,31 +37,70 @@ function shuffleItems(items) {
   return shuffled
 }
 
+function getSourceTitle(source) {
+  return source?.short_title || source?.full_title || 'Untitled book'
+}
+
+function getSectionKey(question) {
+  return question.section?.trim() || 'General'
+}
+
+function getCoverImageUrl(source) {
+  return source?.front_cover_image_url || source?.back_cover_image_url || ''
+}
+
+function getChoiceEntries(question) {
+  return [question.choice_a, question.choice_b, question.choice_c, question.choice_d].map((choiceText, index) => ({
+    index,
+    key: CHOICE_KEYS[index],
+    text: choiceText || 'Unavailable'
+  }))
+}
+
 function GamePage() {
   const [sources, setSources] = useState([])
   const [sourceQuestions, setSourceQuestions] = useState([])
+  const [categories, setCategories] = useState([])
   const [selectedSourceId, setSelectedSourceId] = useState('')
-  const [selectedSection, setSelectedSection] = useState('')
-  const [questionCount, setQuestionCount] = useState(5)
-  const [gameQuestions, setGameQuestions] = useState([])
-  const [selectedAnswers, setSelectedAnswers] = useState({})
+  const [selectedSectionKey, setSelectedSectionKey] = useState('')
+  const [selectedModeId, setSelectedModeId] = useState('')
+  const [questionQueue, setQuestionQueue] = useState([])
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [selectedAnswerIndex, setSelectedAnswerIndex] = useState(null)
+  const [lastAnswerWasCorrect, setLastAnswerWasCorrect] = useState(null)
+  const [correctCount, setCorrectCount] = useState(0)
+  const [attemptedCount, setAttemptedCount] = useState(0)
+  const [livesRemaining, setLivesRemaining] = useState(MAX_MISTAKES_IN_LIVES_MODE + 1)
+  const [secondsRemaining, setSecondsRemaining] = useState(SPRINT_SECONDS)
+  const [shouldEndAfterFeedback, setShouldEndAfterFeedback] = useState(false)
+  const [results, setResults] = useState(null)
+  const [step, setStep] = useState('book')
   const [isLoadingSources, setIsLoadingSources] = useState(true)
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    async function loadSources() {
+    async function loadSetupData() {
       setError('')
 
       try {
-        const rows = await selectFrom('sources', {
-          columns: 'id,short_title,display_order',
-          filters: {
-            is_active: 'eq.true'
-          }
-        })
+        const [sourceRows, categoryRows] = await Promise.all([
+          selectFrom('sources', {
+            columns:
+              'id,short_title,full_title,front_cover_image_url,back_cover_image_url,description,author,display_order,is_active',
+            filters: {
+              is_active: 'eq.true'
+            }
+          }),
+          selectFrom('categories', {
+            columns: 'id,name,is_active',
+            filters: {
+              is_active: 'eq.true'
+            }
+          })
+        ])
 
-        const sortedRows = [...rows].sort((sourceA, sourceB) => {
+        const sortedSources = [...sourceRows].sort((sourceA, sourceB) => {
           const displayOrderA = Number(sourceA.display_order ?? 0)
           const displayOrderB = Number(sourceB.display_order ?? 0)
 
@@ -46,220 +108,459 @@ function GamePage() {
             return displayOrderA - displayOrderB
           }
 
-          return (sourceA.short_title || '').localeCompare(sourceB.short_title || '')
+          return getSourceTitle(sourceA).localeCompare(getSourceTitle(sourceB))
         })
 
-        setSources(sortedRows)
+        setSources(sortedSources)
+        setCategories(categoryRows)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load sources.')
+        setError(err instanceof Error ? err.message : 'Failed to load game setup.')
       } finally {
         setIsLoadingSources(false)
       }
     }
 
-    loadSources()
+    loadSetupData()
   }, [])
 
   useEffect(() => {
-    if (!selectedSourceId) {
-      setSourceQuestions([])
-      setSelectedSection('')
-      setGameQuestions([])
-      setSelectedAnswers({})
-      return
+    if (step !== 'play' || selectedModeId !== GAME_MODES.sprint.id) {
+      return undefined
     }
 
-    async function loadQuestionsForSource() {
-      setIsLoadingQuestions(true)
-      setError('')
+    const timerId = window.setInterval(() => {
+      setSecondsRemaining((currentSeconds) => Math.max(0, currentSeconds - 1))
+    }, 1000)
 
-      try {
-        const rows = await selectFrom('questions', {
-          columns: 'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,section',
-          filters: {
-            is_active: 'eq.true',
-            source_id: `eq.${selectedSourceId}`,
-            question_type: 'eq.mc_single'
-          }
-        })
-
-        setSourceQuestions(rows)
-        setSelectedSection('')
-        setGameQuestions([])
-        setSelectedAnswers({})
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load questions.')
-      } finally {
-        setIsLoadingQuestions(false)
-      }
-    }
-
-    loadQuestionsForSource()
-  }, [selectedSourceId])
-
-  const availableSections = useMemo(() => {
-    const sections = sourceQuestions
-      .map((question) => question.section?.trim() || '')
-      .filter((section) => Boolean(section))
-
-    return [...new Set(sections)]
-  }, [sourceQuestions])
-
-  const filteredQuestions = useMemo(() => {
-    if (!selectedSection) {
-      return sourceQuestions
-    }
-
-    return sourceQuestions.filter((question) => (question.section || '').trim() === selectedSection)
-  }, [sourceQuestions, selectedSection])
-
-  const maxQuestionCount = filteredQuestions.length
+    return () => window.clearInterval(timerId)
+  }, [selectedModeId, step])
 
   useEffect(() => {
-    if (!maxQuestionCount) {
-      setQuestionCount(1)
-      return
+    if (step === 'play' && selectedModeId === GAME_MODES.sprint.id && secondsRemaining === 0) {
+      finishGame()
     }
+  }, [secondsRemaining, selectedModeId, step])
 
-    setQuestionCount((currentCount) => {
-      if (currentCount < 1) {
-        return 1
-      }
+  const selectedSource = useMemo(
+    () => sources.find((source) => String(source.id) === selectedSourceId),
+    [selectedSourceId, sources]
+  )
 
-      if (currentCount > maxQuestionCount) {
-        return maxQuestionCount
-      }
+  const selectedMode = selectedModeId ? GAME_MODES[selectedModeId] : null
 
-      return currentCount
-    })
-  }, [maxQuestionCount])
+  const categoriesById = useMemo(
+    () =>
+      categories.reduce((accumulator, category) => {
+        accumulator[String(category.id)] = category.name
+        return accumulator
+      }, {}),
+    [categories]
+  )
 
-  function handleAnswerClick(questionId, choiceIndex, correctIndex) {
-    setSelectedAnswers((previous) => ({
-      ...previous,
-      [questionId]: {
-        choiceIndex,
-        isCorrect: choiceIndex === Number(correctIndex)
-      }
-    }))
+  const sectionCards = useMemo(() => {
+    const sectionMap = sourceQuestions.reduce((accumulator, question) => {
+      const sectionKey = getSectionKey(question)
+      const existingSection = accumulator.get(sectionKey) || { key: sectionKey, questionCount: 0 }
+      accumulator.set(sectionKey, {
+        ...existingSection,
+        questionCount: existingSection.questionCount + 1
+      })
+      return accumulator
+    }, new Map())
+
+    return [...sectionMap.values()].sort((sectionA, sectionB) => sectionA.key.localeCompare(sectionB.key))
+  }, [sourceQuestions])
+
+  const selectedSectionQuestions = useMemo(
+    () => sourceQuestions.filter((question) => getSectionKey(question) === selectedSectionKey),
+    [selectedSectionKey, sourceQuestions]
+  )
+
+  const currentQuestion = questionQueue[currentQuestionIndex]
+
+  async function handleChooseSource(sourceId) {
+    setSelectedSourceId(String(sourceId))
+    setSelectedSectionKey('')
+    setSelectedModeId('')
+    setQuestionQueue([])
+    setResults(null)
+    setError('')
+    setIsLoadingQuestions(true)
+
+    try {
+      const rows = await selectFrom('questions', {
+        columns:
+          'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,section,category_id',
+        filters: {
+          is_active: 'eq.true',
+          source_id: `eq.${sourceId}`,
+          question_type: 'eq.mc_single'
+        }
+      })
+
+      setSourceQuestions(rows)
+      setStep('section')
+    } catch (err) {
+      setSourceQuestions([])
+      setError(err instanceof Error ? err.message : 'Failed to load questions for this book.')
+    } finally {
+      setIsLoadingQuestions(false)
+    }
   }
 
-  function handleStartGame() {
-    if (!filteredQuestions.length) {
+  function handleChooseSection(sectionKey) {
+    setSelectedSectionKey(sectionKey)
+    setSelectedModeId('')
+    setResults(null)
+    setStep('mode')
+  }
+
+  function handleChooseMode(modeId) {
+    setSelectedModeId(modeId)
+    setResults(null)
+  }
+
+  function startGame() {
+    if (!selectedSource || !selectedSectionKey || !selectedModeId || !selectedSectionQuestions.length) {
       return
     }
 
-    const normalizedCount = Math.max(1, Math.min(Number(questionCount) || 1, filteredQuestions.length))
-    const nextQuestions = shuffleItems(filteredQuestions).slice(0, normalizedCount)
+    setQuestionQueue(shuffleItems(selectedSectionQuestions))
+    setCurrentQuestionIndex(0)
+    setSelectedAnswerIndex(null)
+    setLastAnswerWasCorrect(null)
+    setCorrectCount(0)
+    setAttemptedCount(0)
+    setLivesRemaining(MAX_MISTAKES_IN_LIVES_MODE + 1)
+    setSecondsRemaining(SPRINT_SECONDS)
+    setShouldEndAfterFeedback(false)
+    setResults(null)
+    setStep('play')
+  }
 
-    setGameQuestions(nextQuestions)
-    setSelectedAnswers({})
+  function buildResults(nextCorrectCount = correctCount, nextAttemptedCount = attemptedCount) {
+    return {
+      modeName: GAME_MODES[selectedModeId]?.name || 'Trivia game',
+      sourceTitle: getSourceTitle(selectedSource),
+      sectionName: selectedSectionKey || 'Selected section',
+      correctCount: nextCorrectCount,
+      attemptedCount: nextAttemptedCount,
+      percentCorrect: nextAttemptedCount ? Math.round((nextCorrectCount / nextAttemptedCount) * 100) : 0
+    }
+  }
+
+  function finishGame(nextCorrectCount = correctCount, nextAttemptedCount = attemptedCount) {
+    setResults(buildResults(nextCorrectCount, nextAttemptedCount))
+    setStep('results')
+  }
+
+  function handleAnswer(choiceIndex) {
+    if (!currentQuestion || selectedAnswerIndex !== null) {
+      return
+    }
+
+    const isCorrect = choiceIndex === Number(currentQuestion.correct_index)
+    const nextCorrectCount = correctCount + (isCorrect ? 1 : 0)
+    const nextAttemptedCount = attemptedCount + 1
+    const nextLivesRemaining =
+      selectedModeId === GAME_MODES.lives.id && !isCorrect ? Math.max(0, livesRemaining - 1) : livesRemaining
+    const isLastQuestion = currentQuestionIndex >= questionQueue.length - 1
+    const shouldEndForLives = selectedModeId === GAME_MODES.lives.id && nextLivesRemaining === 0
+
+    setSelectedAnswerIndex(choiceIndex)
+    setLastAnswerWasCorrect(isCorrect)
+    setCorrectCount(nextCorrectCount)
+    setAttemptedCount(nextAttemptedCount)
+    setLivesRemaining(nextLivesRemaining)
+    setShouldEndAfterFeedback(shouldEndForLives || isLastQuestion)
+  }
+
+  function moveToNextQuestion() {
+    if (shouldEndAfterFeedback) {
+      finishGame()
+      return
+    }
+
+    setCurrentQuestionIndex((currentIndex) => currentIndex + 1)
+    setSelectedAnswerIndex(null)
+    setLastAnswerWasCorrect(null)
+    setShouldEndAfterFeedback(false)
+  }
+
+  function chooseAnotherBook() {
+    setSelectedSourceId('')
+    setSelectedSectionKey('')
+    setSelectedModeId('')
+    setQuestionQueue([])
+    setSourceQuestions([])
+    setResults(null)
+    setStep('book')
+  }
+
+  function chooseAnotherSection() {
+    setSelectedSectionKey('')
+    setSelectedModeId('')
+    setQuestionQueue([])
+    setResults(null)
+    setStep(selectedSourceId ? 'section' : 'book')
+  }
+
+  function playAgain() {
+    startGame()
   }
 
   return (
-    <section>
-      <h2>Game</h2>
+    <section className="game-page">
+      <div className="game-hero">
+        <p className="game-eyebrow">Book trivia</p>
+        <h2>Choose a book, pick a section, and start a challenge.</h2>
+        <p>
+          A guided public gameplay flow built around one book and one section at a time. Mixed challenges can come
+          later without changing how today’s game plays.
+        </p>
+      </div>
 
-      {isLoadingSources ? <p>Loading sources...</p> : null}
-      {error ? <p>{error}</p> : null}
+      {error ? <p className="game-error">{error}</p> : null}
 
-      {!isLoadingSources ? (
-        sources.length > 0 ? (
-          <div>
-            <p>1) Choose a source to begin.</p>
-            <label>
-              Source:{' '}
-              <select value={selectedSourceId} onChange={(event) => setSelectedSourceId(event.target.value)}>
-                <option value="">Select a source</option>
-                {sources.map((source) => (
-                  <option key={source.id} value={source.id}>
-                    {source.short_title}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {selectedSourceId ? (
-              <div>
-                {isLoadingQuestions ? <p>Loading source questions...</p> : null}
-
-                {!isLoadingQuestions ? (
-                  <>
-                    <p>2) Optional: choose a section.</p>
-                    <label>
-                      Section:{' '}
-                      <select value={selectedSection} onChange={(event) => setSelectedSection(event.target.value)}>
-                        <option value="">All sections</option>
-                        {availableSections.map((section) => (
-                          <option key={section} value={section}>
-                            {section}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <p>3) Set question count and start.</p>
-                    <label>
-                      Number of questions:{' '}
-                      <input
-                        type="number"
-                        min="1"
-                        max={maxQuestionCount || 1}
-                        value={questionCount}
-                        onChange={(event) => setQuestionCount(Number(event.target.value))}
-                      />
-                    </label>
-
-                    <button type="button" onClick={handleStartGame} disabled={!filteredQuestions.length}>
-                      {gameQuestions.length > 0 ? 'Start new game' : 'Start game'}
-                    </button>
-
-                    {!filteredQuestions.length ? <p>No active questions found for this source/section.</p> : null}
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <p>No active sources found.</p>
-        )
+      {step !== 'play' && step !== 'results' ? (
+        <ol className="game-stepper" aria-label="Game setup steps">
+          <li className={step === 'book' ? 'game-step-active' : ''}>Book</li>
+          <li className={step === 'section' ? 'game-step-active' : ''}>Section</li>
+          <li className={step === 'mode' ? 'game-step-active' : ''}>Mode</li>
+        </ol>
       ) : null}
 
-      {gameQuestions.length > 0 ? (
-        <div>
-          <h3>Questions</h3>
-          <ul>
-            {gameQuestions.map((question) => {
-              const answer = selectedAnswers[question.id]
-              const choiceEntries = [
-                [0, 'A', question.choice_a],
-                [1, 'B', question.choice_b],
-                [2, 'C', question.choice_c],
-                [3, 'D', question.choice_d]
-              ]
+      {step === 'book' ? (
+        <div className="game-panel">
+          <div className="game-panel-heading">
+            <p className="game-eyebrow">Step 1</p>
+            <h3>Choose your book</h3>
+          </div>
 
-              return (
-                <li key={question.id}>
-                  <p>{question.question_text}</p>
+          {isLoadingSources ? <p>Loading books...</p> : null}
 
-                  <div>
-                    {choiceEntries.map(([choiceIndex, choiceKey, choiceText]) => (
-                      <button
-                        key={choiceKey}
-                        type="button"
-                        onClick={() => handleAnswerClick(question.id, choiceIndex, question.correct_index)}
-                        disabled={!choiceText}
-                      >
-                        {choiceKey}: {choiceText ?? 'Unavailable'}
-                      </button>
-                    ))}
-                  </div>
+          {!isLoadingSources && sources.length > 0 ? (
+            <div className="book-card-grid">
+              {sources.map((source) => {
+                const coverImageUrl = getCoverImageUrl(source)
 
-                  {answer ? <p>{answer.isCorrect ? 'Correct!' : 'Incorrect.'}</p> : null}
-                </li>
-              )
-            })}
-          </ul>
+                return (
+                  <button
+                    className="book-card"
+                    key={source.id}
+                    type="button"
+                    onClick={() => handleChooseSource(source.id)}
+                  >
+                    <div className="book-cover-frame">
+                      {coverImageUrl ? (
+                        <img src={coverImageUrl} alt={`${getSourceTitle(source)} cover`} loading="lazy" />
+                      ) : (
+                        <span>No cover yet</span>
+                      )}
+                    </div>
+                    <span className="book-card-title">{getSourceTitle(source)}</span>
+                    {source.author ? <span className="book-card-author">{source.author}</span> : null}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+
+          {!isLoadingSources && !sources.length ? <p>No active books found.</p> : null}
+          {isLoadingQuestions ? <p>Loading sections...</p> : null}
+        </div>
+      ) : null}
+
+      {step === 'section' ? (
+        <div className="game-panel">
+          <div className="game-panel-heading">
+            <p className="game-eyebrow">Step 2</p>
+            <h3>Choose a section</h3>
+            <p>{selectedSource ? getSourceTitle(selectedSource) : 'Selected book'}</p>
+          </div>
+
+          {isLoadingQuestions ? <p>Loading sections...</p> : null}
+
+          {!isLoadingQuestions && sectionCards.length > 0 ? (
+            <div className="section-card-grid">
+              {sectionCards.map((section) => (
+                <button
+                  className="section-card"
+                  key={section.key}
+                  type="button"
+                  onClick={() => handleChooseSection(section.key)}
+                >
+                  <span>{section.key}</span>
+                  <small>{section.questionCount} questions available</small>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {!isLoadingQuestions && !sectionCards.length ? <p>No active sections found for this book.</p> : null}
+
+          <button className="game-secondary-button" type="button" onClick={chooseAnotherBook}>
+            Choose another book
+          </button>
+        </div>
+      ) : null}
+
+      {step === 'mode' ? (
+        <div className="game-panel">
+          <div className="game-panel-heading">
+            <p className="game-eyebrow">Step 3</p>
+            <h3>Choose your game mode</h3>
+            <p>
+              {selectedSource ? getSourceTitle(selectedSource) : 'Selected book'} · {selectedSectionKey}
+            </p>
+          </div>
+
+          <div className="mode-card-grid">
+            {Object.values(GAME_MODES).map((mode) => (
+              <button
+                className={selectedModeId === mode.id ? 'mode-card mode-card-selected' : 'mode-card'}
+                key={mode.id}
+                type="button"
+                onClick={() => handleChooseMode(mode.id)}
+              >
+                <span>{mode.tagline}</span>
+                <strong>{mode.name}</strong>
+                <small>{mode.description}</small>
+              </button>
+            ))}
+          </div>
+
+          <button
+            className="game-primary-button"
+            type="button"
+            onClick={startGame}
+            disabled={!selectedModeId || !selectedSectionQuestions.length}
+          >
+            Start playing
+          </button>
+          <button className="game-secondary-button" type="button" onClick={chooseAnotherSection}>
+            Choose another section
+          </button>
+        </div>
+      ) : null}
+
+      {step === 'play' && currentQuestion ? (
+        <div className="play-screen">
+          <div className="play-status-bar">
+            <div>
+              <span>{selectedMode?.shortName}</span>
+              <strong>
+                {selectedModeId === GAME_MODES.sprint.id
+                  ? `${secondsRemaining}s`
+                  : `${livesRemaining} ${livesRemaining === 1 ? 'life' : 'lives'}`}
+              </strong>
+            </div>
+            <div>
+              <span>Score</span>
+              <strong>
+                {correctCount}/{attemptedCount} correct
+              </strong>
+            </div>
+          </div>
+
+          <article className="question-card">
+            {categoriesById[String(currentQuestion.category_id)] ? (
+              <span className="category-pill">{categoriesById[String(currentQuestion.category_id)]}</span>
+            ) : null}
+            <p className="question-count-label">
+              Question {currentQuestionIndex + 1} of {questionQueue.length}
+            </p>
+            <h3>{currentQuestion.question_text}</h3>
+
+            <div className="answer-grid">
+              {getChoiceEntries(currentQuestion).map((choice) => {
+                const isSelected = selectedAnswerIndex === choice.index
+                const isCorrectChoice = choice.index === Number(currentQuestion.correct_index)
+                let buttonClassName = 'answer-button'
+
+                if (selectedAnswerIndex !== null && isCorrectChoice) {
+                  buttonClassName += ' answer-button-correct'
+                } else if (isSelected && !isCorrectChoice) {
+                  buttonClassName += ' answer-button-incorrect'
+                }
+
+                return (
+                  <button
+                    className={buttonClassName}
+                    key={choice.key}
+                    type="button"
+                    onClick={() => handleAnswer(choice.index)}
+                    disabled={selectedAnswerIndex !== null || choice.text === 'Unavailable'}
+                  >
+                    <span>{choice.key}</span>
+                    {choice.text}
+                  </button>
+                )
+              })}
+            </div>
+
+            {selectedAnswerIndex !== null ? (
+              <div className={lastAnswerWasCorrect ? 'answer-feedback correct' : 'answer-feedback incorrect'}>
+                <strong>{lastAnswerWasCorrect ? 'Correct!' : 'Not quite.'}</strong>
+                <span>
+                  {shouldEndAfterFeedback
+                    ? 'Review your result when you are ready.'
+                    : 'Tap next to keep the game moving.'}
+                </span>
+              </div>
+            ) : null}
+          </article>
+
+          {selectedAnswerIndex !== null ? (
+            <button className="game-primary-button" type="button" onClick={moveToNextQuestion}>
+              {shouldEndAfterFeedback ? 'Show results' : 'Next question'}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {step === 'results' && results ? (
+        <div className="results-screen">
+          <p className="game-eyebrow">Results</p>
+          <h3>{results.percentCorrect}% correct</h3>
+          <dl className="results-list">
+            <div>
+              <dt>Mode played</dt>
+              <dd>{results.modeName}</dd>
+            </div>
+            <div>
+              <dt>Book</dt>
+              <dd>{results.sourceTitle}</dd>
+            </div>
+            <div>
+              <dt>Section</dt>
+              <dd>{results.sectionName}</dd>
+            </div>
+            <div>
+              <dt>Correct answers</dt>
+              <dd>{results.correctCount}</dd>
+            </div>
+            <div>
+              <dt>Attempted questions</dt>
+              <dd>{results.attemptedCount}</dd>
+            </div>
+            <div>
+              <dt>Percent correct</dt>
+              <dd>{results.percentCorrect}%</dd>
+            </div>
+          </dl>
+
+          <div className="result-actions">
+            <button className="game-primary-button" type="button" onClick={playAgain}>
+              Play again
+            </button>
+            <button className="game-secondary-button" type="button" onClick={chooseAnotherSection}>
+              Choose another section
+            </button>
+            <button className="game-secondary-button" type="button" onClick={chooseAnotherBook}>
+              Choose another book
+            </button>
+          </div>
         </div>
       ) : null}
     </section>
