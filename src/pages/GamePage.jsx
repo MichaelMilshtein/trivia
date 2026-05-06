@@ -279,7 +279,7 @@ function GamePage() {
     return {
       challengeName: GAME_MODES[selectedModeId]?.name || 'Trivia game',
       sourceTitle: getSourceTitle(selectedSource),
-      sectionName: selectedSectionKey || 'Selected section',
+      sectionName: selectedSectionKey || 'General',
       correctCount: nextCorrectCount,
       attemptedCount: nextAttemptedCount,
       percentCorrect: nextAttemptedCount ? Math.round((nextCorrectCount / nextAttemptedCount) * 100) : 0
@@ -348,6 +348,12 @@ function GamePage() {
 
   const heroClassName = step === 'book' ? 'game-hero game-hero-book' : `game-hero game-hero-compact${step === 'play' || step === 'results' ? ' game-hero-minimal' : ''}`
   const selectedSourceCoverImageUrl = getCoverImageUrl(selectedSource)
+  const selectedSourceTitle = getSourceTitle(selectedSource)
+  const heroDescription = selectedSource
+    ? selectedSectionKey
+      ? `${selectedSourceTitle} · ${selectedSectionKey}`
+      : selectedSourceTitle
+    : 'Choose a section, pick a challenge, and keep the questions moving.'
 
   return (
     <section className="game-page">
@@ -364,9 +370,7 @@ function GamePage() {
             <p>
               {step === 'book'
                 ? 'Pick a favorite volume, choose a section, then test what you remember before the bookmark slips.'
-                : selectedSource
-                  ? `${getSourceTitle(selectedSource)} · ${selectedSectionKey || 'Selected section'}`
-                  : 'Choose a section, pick a challenge, and keep the questions moving.'}
+                : heroDescription}
             </p>
           </div>
         </div>
