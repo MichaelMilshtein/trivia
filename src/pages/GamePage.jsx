@@ -353,8 +353,8 @@ function GamePage() {
     <section className="game-page">
       <div className={heroClassName}>
         <p className="game-eyebrow">Book trivia</p>
-        <div className={step === 'play' || step === 'results' ? 'game-hero-playing' : ''}>
-          {step === 'play' || step === 'results' ? (
+        <div className={selectedSource ? 'game-hero-playing' : ''}>
+          {selectedSource ? (
             <div className="game-hero-cover" aria-hidden="true">
               {selectedSourceCoverImageUrl ? <img src={selectedSourceCoverImageUrl} alt="" /> : <span>Book</span>}
             </div>
