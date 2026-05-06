@@ -331,7 +331,7 @@ function GamePage() {
     startGame()
   }
 
-  const heroClassName = step === 'book' ? 'game-hero' : 'game-hero game-hero-compact'
+  const heroClassName = step === 'book' ? 'game-hero' : `game-hero game-hero-compact${step === 'play' || step === 'results' ? ' game-hero-minimal' : ''}`
 
   return (
     <section className="game-page">
