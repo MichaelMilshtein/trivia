@@ -436,7 +436,6 @@ function GamePage() {
           <div className="game-panel-heading">
             <p className="game-eyebrow">Step 2 · Pick a chapter path</p>
             <h3>Choose a section</h3>
-            <p>{selectedSource ? getSourceTitle(selectedSource) : 'Selected book'} is ready. Select the shelf you want to quiz from.</p>
           </div>
 
           {isLoadingQuestions ? <p>Loading sections...</p> : null}
@@ -452,7 +451,6 @@ function GamePage() {
                 >
                   <span className="section-card-mark" aria-hidden="true">{getSectionAccent(index)}</span>
                   <span className="section-card-title">{section.key}</span>
-                  <small>{section.questionCount} questions tucked inside</small>
                 </button>
               ))}
             </div>
@@ -471,9 +469,6 @@ function GamePage() {
           <div className="game-panel-heading">
             <p className="game-eyebrow">Step 3 · Set the rules</p>
             <h3>Choose your challenge</h3>
-            <p>
-              {selectedSource ? getSourceTitle(selectedSource) : 'Selected book'} · {selectedSectionKey}. Pick the challenge that fits your reading mood.
-            </p>
           </div>
 
           <div className="mode-card-grid">
@@ -569,11 +564,7 @@ function GamePage() {
             {selectedAnswerIndex !== null ? (
               <div className={lastAnswerWasCorrect ? 'answer-feedback correct' : 'answer-feedback incorrect'}>
                 <strong>{lastAnswerWasCorrect ? 'Correct!' : 'Not quite.'}</strong>
-                <span>
-                  {shouldEndAfterFeedback
-                    ? 'Review your result when you are ready.'
-                    : 'Tap next to keep the game moving.'}
-                </span>
+                {shouldEndAfterFeedback ? <span>Review your result when you are ready.</span> : null}
               </div>
             ) : null}
           </article>
