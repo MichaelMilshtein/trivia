@@ -8,7 +8,8 @@ const GAME_MODES = {
     shortName: 'Sprint',
     tagline: 'Race the clock',
     description: 'You have 60 seconds to answer as many questions as possible.',
-    statusLabel: 'Timer'
+    statusLabel: 'Timer',
+    icon: '⏱️'
   },
   lives: {
     id: 'lives',
@@ -16,7 +17,8 @@ const GAME_MODES = {
     shortName: 'Three Lives',
     tagline: 'Protect your streak',
     description: 'No timer. Your third wrong answer ends the game.',
-    statusLabel: 'Lives'
+    statusLabel: 'Lives',
+    icon: '♥'
   }
 }
 
@@ -55,6 +57,26 @@ function getChoiceEntries(question) {
     key: CHOICE_KEYS[index],
     text: choiceText || 'Unavailable'
   }))
+}
+
+function getResultMessage(percentCorrect) {
+  if (percentCorrect >= 90) {
+    return 'A shelf-worthy finish. You clearly know this chapter by heart.'
+  }
+
+  if (percentCorrect >= 70) {
+    return 'Nicely played. Your bookmark landed near the answer key.'
+  }
+
+  if (percentCorrect >= 40) {
+    return 'A solid read-through. Try another pass and chase a higher score.'
+  }
+
+  return 'Every great trivia run starts with a first page. Give the section another go.'
+}
+
+function getSectionAccent(index) {
+  return ['I', 'II', 'III', 'IV', 'V', 'VI'][index % 6]
 }
 
 function GamePage() {
@@ -309,14 +331,19 @@ function GamePage() {
     startGame()
   }
 
+  const heroClassName = step === 'book' ? 'game-hero' : 'game-hero game-hero-compact'
+
   return (
     <section className="game-page">
-      <div className="game-hero">
+      <div className={heroClassName}>
         <p className="game-eyebrow">Book trivia</p>
-        <h2>Choose a book, pick a section, and start a challenge.</h2>
+        <h2>{step === 'book' ? 'Pull a book from the trivia shelf.' : 'Your reading challenge is underway.'}</h2>
         <p>
-          A guided public gameplay flow built around one book and one section at a time. Mixed challenges can come
-          later without changing how today’s game plays.
+          {step === 'book'
+            ? 'Pick a favorite volume, choose a section, then test what you remember before the bookmark slips.'
+            : selectedSource
+              ? `${getSourceTitle(selectedSource)} is open. Keep turning pages through ${selectedSectionKey || 'your section'}.`
+              : 'Choose a section, pick a mode, and keep the questions moving.'}
         </p>
       </div>
 
@@ -333,14 +360,15 @@ function GamePage() {
       {step === 'book' ? (
         <div className="game-panel">
           <div className="game-panel-heading">
-            <p className="game-eyebrow">Step 1</p>
+            <p className="game-eyebrow">Step 1 · Library shelf</p>
             <h3>Choose your book</h3>
+            <p>Tap a cover to open that book’s question shelves.</p>
           </div>
 
           {isLoadingSources ? <p>Loading books...</p> : null}
 
           {!isLoadingSources && sources.length > 0 ? (
-            <div className="book-card-grid">
+            <div className="book-card-grid" aria-label="Available trivia books">
               {sources.map((source) => {
                 const coverImageUrl = getCoverImageUrl(source)
 
@@ -358,8 +386,11 @@ function GamePage() {
                         <span>No cover yet</span>
                       )}
                     </div>
-                    <span className="book-card-title">{getSourceTitle(source)}</span>
-                    {source.author ? <span className="book-card-author">{source.author}</span> : null}
+                    <span className="book-card-copy">
+                      <span className="book-card-kicker">Open volume</span>
+                      <span className="book-card-title">{getSourceTitle(source)}</span>
+                      {source.author ? <span className="book-card-author">{source.author}</span> : null}
+                    </span>
                   </button>
                 )
               })}
@@ -374,24 +405,25 @@ function GamePage() {
       {step === 'section' ? (
         <div className="game-panel">
           <div className="game-panel-heading">
-            <p className="game-eyebrow">Step 2</p>
+            <p className="game-eyebrow">Step 2 · Pick a chapter path</p>
             <h3>Choose a section</h3>
-            <p>{selectedSource ? getSourceTitle(selectedSource) : 'Selected book'}</p>
+            <p>{selectedSource ? getSourceTitle(selectedSource) : 'Selected book'} is ready. Select the shelf you want to quiz from.</p>
           </div>
 
           {isLoadingQuestions ? <p>Loading sections...</p> : null}
 
           {!isLoadingQuestions && sectionCards.length > 0 ? (
             <div className="section-card-grid">
-              {sectionCards.map((section) => (
+              {sectionCards.map((section, index) => (
                 <button
                   className="section-card"
                   key={section.key}
                   type="button"
                   onClick={() => handleChooseSection(section.key)}
                 >
-                  <span>{section.key}</span>
-                  <small>{section.questionCount} questions available</small>
+                  <span className="section-card-mark" aria-hidden="true">{getSectionAccent(index)}</span>
+                  <span className="section-card-title">{section.key}</span>
+                  <small>{section.questionCount} questions tucked inside</small>
                 </button>
               ))}
             </div>
@@ -408,10 +440,10 @@ function GamePage() {
       {step === 'mode' ? (
         <div className="game-panel">
           <div className="game-panel-heading">
-            <p className="game-eyebrow">Step 3</p>
+            <p className="game-eyebrow">Step 3 · Set the rules</p>
             <h3>Choose your game mode</h3>
             <p>
-              {selectedSource ? getSourceTitle(selectedSource) : 'Selected book'} · {selectedSectionKey}
+              {selectedSource ? getSourceTitle(selectedSource) : 'Selected book'} · {selectedSectionKey}. Pick the challenge that fits your reading mood.
             </p>
           </div>
 
@@ -423,7 +455,8 @@ function GamePage() {
                 type="button"
                 onClick={() => handleChooseMode(mode.id)}
               >
-                <span>{mode.tagline}</span>
+                <span className="mode-card-icon" aria-hidden="true">{mode.icon}</span>
+                <span className="mode-card-tagline">{mode.tagline}</span>
                 <strong>{mode.name}</strong>
                 <small>{mode.description}</small>
               </button>
@@ -521,8 +554,9 @@ function GamePage() {
 
       {step === 'results' && results ? (
         <div className="results-screen">
-          <p className="game-eyebrow">Results</p>
+          <p className="game-eyebrow">Challenge complete</p>
           <h3>{results.percentCorrect}% correct</h3>
+          <p className="results-summary">{getResultMessage(results.percentCorrect)}</p>
           <dl className="results-list">
             <div>
               <dt>Mode played</dt>
@@ -538,11 +572,11 @@ function GamePage() {
             </div>
             <div>
               <dt>Correct answers</dt>
-              <dd>{results.correctCount}</dd>
+              <dd>{results.correctCount} right</dd>
             </div>
             <div>
               <dt>Attempted questions</dt>
-              <dd>{results.attemptedCount}</dd>
+              <dd>{results.attemptedCount} turned</dd>
             </div>
             <div>
               <dt>Percent correct</dt>
