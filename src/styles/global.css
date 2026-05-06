@@ -520,7 +520,9 @@ body {
 }
 
 .section-card {
-  padding-left: 3.5rem;
+  justify-content: center;
+  min-height: 66px;
+  padding: 0.55rem 0.65rem 0.55rem 3rem;
   background: linear-gradient(135deg, #ffffff 0%, #fffaf0 100%);
 }
 
@@ -536,18 +538,19 @@ body {
 
 .section-card-mark {
   position: absolute;
-  left: 0.75rem;
-  top: 0.75rem;
+  left: 0.65rem;
+  top: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 1.8rem;
+  height: 1.8rem;
   border-radius: 0.75rem;
   background: #fef3c7;
   color: #92400e;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 900;
+  transform: translateY(-50%);
 }
 
 .section-card-title,
