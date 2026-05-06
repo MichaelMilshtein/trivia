@@ -293,6 +293,42 @@ body {
   line-height: 1.1;
 }
 
+.game-hero-book h2 {
+  max-width: 100%;
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
+  line-height: 1.08;
+}
+
+.game-hero-playing {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.game-hero-cover {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 3.2rem;
+  height: 4.1rem;
+  overflow: hidden;
+  border: 1px solid #d7c7b2;
+  border-radius: 0.45rem;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  box-shadow: 0 6px 16px rgba(90, 64, 37, 0.16);
+}
+
+.game-hero-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .game-hero p:last-child,
 .game-panel-heading p:last-child {
   max-width: 58rem;
@@ -639,15 +675,28 @@ body {
   box-shadow: inset 0 0 0 4px rgba(255, 250, 240, 0.9);
 }
 
-.category-pill {
-  display: inline-flex;
+.question-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
   margin-bottom: 0.45rem;
+}
+
+.category-pill,
+.difficulty-pill {
+  display: inline-flex;
   padding: 0.25rem 0.55rem;
   border-radius: 999px;
   background: #e0f2fe;
   color: #075985;
   font-size: 0.78rem;
   font-weight: 900;
+}
+
+.difficulty-pill {
+  background: #fef3c7;
+  color: #92400e;
+  text-transform: capitalize;
 }
 
 .question-count-label {

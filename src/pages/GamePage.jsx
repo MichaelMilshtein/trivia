@@ -7,7 +7,7 @@ const GAME_MODES = {
     name: '60-Second Sprint',
     shortName: 'Sprint',
     tagline: 'Race the clock',
-    description: 'You have 60 seconds to answer as many questions as possible.',
+    description: 'You have 20 seconds to answer as many questions as possible.',
     statusLabel: 'Timer',
     icon: '⏱️'
   },
@@ -22,8 +22,9 @@ const GAME_MODES = {
   }
 }
 
-const SPRINT_SECONDS = 60
+const SPRINT_SECONDS = 20
 const MAX_MISTAKES_IN_LIVES_MODE = 2
+const SHOW_CORRECT_ANSWER_DEBUG = true
 const CHOICE_KEYS = ['A', 'B', 'C', 'D']
 
 function shuffleItems(items) {
@@ -52,11 +53,25 @@ function getCoverImageUrl(source) {
 }
 
 function getChoiceEntries(question) {
+  if (question.shuffledChoices) {
+    return question.shuffledChoices.map((choice, displayIndex) => ({
+      ...choice,
+      key: CHOICE_KEYS[displayIndex]
+    }))
+  }
+
   return [question.choice_a, question.choice_b, question.choice_c, question.choice_d].map((choiceText, index) => ({
     index,
     key: CHOICE_KEYS[index],
     text: choiceText || 'Unavailable'
   }))
+}
+
+function prepareQuestionForPlay(question) {
+  return {
+    ...question,
+    shuffledChoices: shuffleItems(getChoiceEntries(question))
+  }
 }
 
 function getResultMessage(percentCorrect) {
@@ -72,7 +87,7 @@ function getResultMessage(percentCorrect) {
     return 'A solid read-through. Try another pass and chase a higher score.'
   }
 
-  return 'Every great trivia run starts with a first page. Give the section another go.'
+  return 'Try another pass and chase a higher score.'
 }
 
 function getSectionAccent(index) {
@@ -212,7 +227,7 @@ function GamePage() {
     try {
       const rows = await selectFrom('questions', {
         columns:
-          'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,section,category_id',
+          'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,section,category_id',
         filters: {
           is_active: 'eq.true',
           source_id: `eq.${sourceId}`,
@@ -247,7 +262,7 @@ function GamePage() {
       return
     }
 
-    setQuestionQueue(shuffleItems(selectedSectionQuestions))
+    setQuestionQueue(shuffleItems(selectedSectionQuestions).map(prepareQuestionForPlay))
     setCurrentQuestionIndex(0)
     setSelectedAnswerIndex(null)
     setLastAnswerWasCorrect(null)
@@ -262,7 +277,7 @@ function GamePage() {
 
   function buildResults(nextCorrectCount = correctCount, nextAttemptedCount = attemptedCount) {
     return {
-      modeName: GAME_MODES[selectedModeId]?.name || 'Trivia game',
+      challengeName: GAME_MODES[selectedModeId]?.name || 'Trivia game',
       sourceTitle: getSourceTitle(selectedSource),
       sectionName: selectedSectionKey || 'Selected section',
       correctCount: nextCorrectCount,
@@ -331,20 +346,30 @@ function GamePage() {
     startGame()
   }
 
-  const heroClassName = step === 'book' ? 'game-hero' : `game-hero game-hero-compact${step === 'play' || step === 'results' ? ' game-hero-minimal' : ''}`
+  const heroClassName = step === 'book' ? 'game-hero game-hero-book' : `game-hero game-hero-compact${step === 'play' || step === 'results' ? ' game-hero-minimal' : ''}`
+  const selectedSourceCoverImageUrl = getCoverImageUrl(selectedSource)
 
   return (
     <section className="game-page">
       <div className={heroClassName}>
         <p className="game-eyebrow">Book trivia</p>
-        <h2>{step === 'book' ? 'Pull a book from the trivia shelf.' : 'Your reading challenge is underway.'}</h2>
-        <p>
-          {step === 'book'
-            ? 'Pick a favorite volume, choose a section, then test what you remember before the bookmark slips.'
-            : selectedSource
-              ? `${getSourceTitle(selectedSource)} is open. Keep turning pages through ${selectedSectionKey || 'your section'}.`
-              : 'Choose a section, pick a mode, and keep the questions moving.'}
-        </p>
+        <div className={step === 'play' || step === 'results' ? 'game-hero-playing' : ''}>
+          {step === 'play' || step === 'results' ? (
+            <div className="game-hero-cover" aria-hidden="true">
+              {selectedSourceCoverImageUrl ? <img src={selectedSourceCoverImageUrl} alt="" /> : <span>Book</span>}
+            </div>
+          ) : null}
+          <div>
+            <h2>{step === 'book' ? 'Pull a book from the trivia shelf.' : step === 'play' || step === 'results' ? 'You are playing' : 'Your reading challenge is underway.'}</h2>
+            <p>
+              {step === 'book'
+                ? 'Pick a favorite volume, choose a section, then test what you remember before the bookmark slips.'
+                : selectedSource
+                  ? `${getSourceTitle(selectedSource)} · ${selectedSectionKey || 'Selected section'}`
+                  : 'Choose a section, pick a challenge, and keep the questions moving.'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {error ? <p className="game-error">{error}</p> : null}
@@ -353,7 +378,7 @@ function GamePage() {
         <ol className="game-stepper" aria-label="Game setup steps">
           <li className={step === 'book' ? 'game-step-active' : ''}>Book</li>
           <li className={step === 'section' ? 'game-step-active' : ''}>Section</li>
-          <li className={step === 'mode' ? 'game-step-active' : ''}>Mode</li>
+          <li className={step === 'mode' ? 'game-step-active' : ''}>Challenge</li>
         </ol>
       ) : null}
 
@@ -441,7 +466,7 @@ function GamePage() {
         <div className="game-panel">
           <div className="game-panel-heading">
             <p className="game-eyebrow">Step 3 · Set the rules</p>
-            <h3>Choose your game mode</h3>
+            <h3>Choose your challenge</h3>
             <p>
               {selectedSource ? getSourceTitle(selectedSource) : 'Selected book'} · {selectedSectionKey}. Pick the challenge that fits your reading mood.
             </p>
@@ -497,11 +522,16 @@ function GamePage() {
           </div>
 
           <article className="question-card">
-            {categoriesById[String(currentQuestion.category_id)] ? (
-              <span className="category-pill">{categoriesById[String(currentQuestion.category_id)]}</span>
-            ) : null}
+            <div className="question-pill-row">
+              {categoriesById[String(currentQuestion.category_id)] ? (
+                <span className="category-pill">{categoriesById[String(currentQuestion.category_id)]}</span>
+              ) : null}
+              {currentQuestion.difficulty ? (
+                <span className="difficulty-pill">{currentQuestion.difficulty}</span>
+              ) : null}
+            </div>
             <p className="question-count-label">
-              Question {currentQuestionIndex + 1} of {questionQueue.length}
+              Question {currentQuestionIndex + 1}
             </p>
             <h3>{currentQuestion.question_text}</h3>
 
@@ -511,7 +541,7 @@ function GamePage() {
                 const isCorrectChoice = choice.index === Number(currentQuestion.correct_index)
                 let buttonClassName = 'answer-button'
 
-                if (selectedAnswerIndex !== null && isCorrectChoice) {
+                if ((selectedAnswerIndex !== null || SHOW_CORRECT_ANSWER_DEBUG) && isCorrectChoice) {
                   buttonClassName += ' answer-button-correct'
                 } else if (isSelected && !isCorrectChoice) {
                   buttonClassName += ' answer-button-incorrect'
@@ -520,7 +550,7 @@ function GamePage() {
                 return (
                   <button
                     className={buttonClassName}
-                    key={choice.key}
+                    key={`${choice.key}-${choice.index}`}
                     type="button"
                     onClick={() => handleAnswer(choice.index)}
                     disabled={selectedAnswerIndex !== null || choice.text === 'Unavailable'}
@@ -559,8 +589,8 @@ function GamePage() {
           <p className="results-summary">{getResultMessage(results.percentCorrect)}</p>
           <dl className="results-list">
             <div>
-              <dt>Mode played</dt>
-              <dd>{results.modeName}</dd>
+              <dt>Challenge played</dt>
+              <dd>{results.challengeName}</dd>
             </div>
             <div>
               <dt>Book</dt>
@@ -572,11 +602,11 @@ function GamePage() {
             </div>
             <div>
               <dt>Correct answers</dt>
-              <dd>{results.correctCount} right</dd>
+              <dd>{results.correctCount}</dd>
             </div>
             <div>
               <dt>Attempted questions</dt>
-              <dd>{results.attemptedCount} turned</dd>
+              <dd>{results.attemptedCount}</dd>
             </div>
             <div>
               <dt>Percent correct</dt>
