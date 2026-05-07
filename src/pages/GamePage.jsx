@@ -95,8 +95,8 @@ function getResultMessage(percentCorrect) {
   return 'Try another pass and chase a higher score.'
 }
 
-function getSectionAccent(index) {
-  return ['I', 'II', 'III', 'IV', 'V', 'VI'][index % 6]
+function getSectionIcon(index) {
+  return ['📻', '🎞️', '🎙️', '🕺', '📺', '💿', '🎮', '⭐'][index % 8]
 }
 
 function GamePage() {
@@ -353,22 +353,30 @@ function GamePage() {
 
   const heroClassName = step === 'book' ? 'game-hero game-hero-book' : `game-hero game-hero-compact${step === 'play' || step === 'results' ? ' game-hero-minimal' : ''}`
   const selectedSourceTitle = getSourceTitle(selectedSource)
+  const isCompactPlayHeader = step === 'play' || step === 'results'
+  const heroTitle = step === 'book'
+    ? 'Nostalgic Decades Trivia'
+    : isCompactPlayHeader
+      ? selectedSourceTitle
+      : 'Your decade challenge is underway.'
   const heroDescription = selectedSource
-    ? selectedSectionKey
-      ? `${selectedSourceTitle} · ${selectedSectionKey}`
-      : selectedSourceTitle
-    : 'Choose a section, pick a challenge, and keep the questions moving.'
+    ? isCompactPlayHeader
+      ? selectedMode?.name || 'Keep the questions moving.'
+      : selectedSectionKey
+        ? `${selectedSourceTitle} · ${selectedSectionKey}`
+        : selectedSourceTitle
+    : 'Choose a book, follow the path, and keep the questions moving.'
 
   return (
     <section className="game-page">
       <div className={heroClassName}>
-        <p className="game-eyebrow">Book trivia</p>
+        <p className="game-eyebrow">Nostalgic Decades Trivia</p>
         <div className={selectedSource ? 'game-hero-playing' : ''}>
           <div>
-            <h2>{step === 'book' ? 'Pull a book from the trivia shelf.' : step === 'play' || step === 'results' ? 'You are playing' : 'Your reading challenge is underway.'}</h2>
+            <h2>{heroTitle}</h2>
             <p>
               {step === 'book'
-                ? 'Pick a favorite volume, choose a section, then test what you remember before the bookmark slips.'
+                ? 'Pick a decade volume, follow Book → Section → Challenge, then test what you remember.'
                 : heroDescription}
             </p>
           </div>
@@ -379,9 +387,15 @@ function GamePage() {
 
       {step !== 'play' && step !== 'results' ? (
         <ol className="game-stepper" aria-label="Game setup steps">
-          <li className={step === 'book' ? 'game-step-active' : ''}>Book</li>
-          <li className={step === 'section' ? 'game-step-active' : ''}>Section</li>
-          <li className={step === 'mode' ? 'game-step-active' : ''}>Challenge</li>
+          <li className={step === 'book' ? 'game-step-active' : ''}>
+            <span>1</span>Book
+          </li>
+          <li className={step === 'section' ? 'game-step-active' : ''}>
+            <span>2</span>Section
+          </li>
+          <li className={step === 'mode' ? 'game-step-active' : ''}>
+            <span>3</span>Challenge
+          </li>
         </ol>
       ) : null}
 
@@ -459,8 +473,9 @@ function GamePage() {
                   type="button"
                   onClick={() => handleChooseSection(section.key)}
                 >
-                  <span className="section-card-mark" aria-hidden="true">{getSectionAccent(index)}</span>
+                  <span className="section-card-mark" aria-hidden="true">{getSectionIcon(index)}</span>
                   <span className="section-card-title">{section.key}</span>
+                  <small>{section.questionCount} questions</small>
                 </button>
               ))}
             </div>

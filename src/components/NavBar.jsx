@@ -1,11 +1,23 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { navItems } from '../lib/navigation'
 
 function NavBar() {
+  const location = useLocation()
+  const isAdminPage = location.pathname === '/admin'
+
   return (
-    <header className="site-header">
-      <h1>Trivia Sandbox</h1>
-      <nav>
+    <header className={isAdminPage ? 'site-header' : 'site-header site-header-public'}>
+      <div className="site-brand">
+        {!isAdminPage ? (
+          <img
+            className="site-brand-mascot"
+            src="/images/brand/lenny-lenski-peek.png"
+            alt="Lenny Lenski"
+          />
+        ) : null}
+        <h1>{isAdminPage ? 'Trivia Sandbox' : 'Nostalgic Decades Trivia'}</h1>
+      </div>
+      <nav aria-label="Primary navigation">
         <ul className="nav-list">
           {navItems.map((item) => (
             <li key={item.path}>
