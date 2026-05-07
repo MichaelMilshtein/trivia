@@ -8,7 +8,11 @@ import AdminPage from './pages/AdminPage'
 function App() {
   const location = useLocation()
   const pageContainerClassName =
-    location.pathname === '/admin' ? 'page-container page-container-wide' : 'page-container'
+    location.pathname === '/admin'
+      ? 'page-container page-container-wide'
+      : location.pathname === '/game'
+        ? 'page-container game-page-container'
+        : 'page-container'
 
   return (
     <div className="app-shell">

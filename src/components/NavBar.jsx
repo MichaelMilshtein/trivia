@@ -4,9 +4,10 @@ import { navItems } from '../lib/navigation'
 function NavBar() {
   const location = useLocation()
   const isAdminPage = location.pathname === '/admin'
+  const isGamePage = location.pathname === '/game'
 
   return (
-    <header className={isAdminPage ? 'site-header' : 'site-header site-header-public'}>
+    <header className={isAdminPage ? 'site-header' : isGamePage ? 'site-header site-header-game' : 'site-header site-header-public'}>
       <div className="site-brand">
         {!isAdminPage ? (
           <img
