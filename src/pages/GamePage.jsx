@@ -519,16 +519,16 @@ function GamePage() {
       {step !== 'play' && step !== 'results' ? (
         <ol className="game-stepper" aria-label="Game setup steps">
           {[
-            ['01', 'Books'],
-            ['02', 'Sections'],
+            ['01', 'Book'],
+            ['02', 'Section'],
             ['03', 'Challenge']
           ].map(([number, label], index) => (
             <li
               className={index < activeStepIndex ? 'game-step-complete' : index === activeStepIndex ? 'game-step-active' : ''}
               key={label}
             >
-              <span className="game-step-line" aria-hidden="true" />
-              <span className="game-step-copy"><b>{number}</b> · {label}</span>
+              <span className="game-step-number">{number}</span>
+              <span className="game-step-label">{label}</span>
             </li>
           ))}
         </ol>
