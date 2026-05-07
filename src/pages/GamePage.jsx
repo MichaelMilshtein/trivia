@@ -10,7 +10,7 @@ const GAME_MODES = {
     tagline: 'Race the clock',
     description: 'You have 20 seconds to answer as many questions as possible.',
     statusLabel: 'Timer',
-    icon: '⏱️'
+    icon: 'stopwatch'
   },
   lives: {
     id: 'lives',
@@ -19,7 +19,7 @@ const GAME_MODES = {
     tagline: 'Protect your streak',
     description: 'No timer. Your third wrong answer ends the game.',
     statusLabel: 'Lives',
-    icon: '♥'
+    icon: 'heart'
   }
 }
 
@@ -194,6 +194,40 @@ function SectionIcon({ type }) {
       <path d="M12 4a12 12 0 0 0 0 16" />
       <path d="M15 15h5v5h-5z" />
       <path d="M16.5 17h2" />
+    </svg>
+  )
+}
+
+function ChallengeIcon({ type }) {
+  const commonProps = {
+    className: 'challenge-card-icon-svg',
+    viewBox: '0 0 64 64',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: '4',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  }
+
+  if (type === 'stopwatch') {
+    return (
+      <svg {...commonProps}>
+        <path d="M25 8h14" />
+        <path d="M32 8v8" />
+        <path d="m45 17 5 5" />
+        <circle cx="32" cy="36" r="20" />
+        <path d="M32 24v13l9 5" />
+        <path d="M18 36h3" />
+        <path d="M43 36h3" />
+        <path d="M32 49v3" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg {...commonProps} fill="currentColor" stroke="none">
+      <path d="M32 54S10 41.3 10 24.8C10 15.7 15.8 10 23.3 10c4.5 0 7.3 2.2 8.7 4.1C33.4 12.2 36.2 10 40.7 10 48.2 10 54 15.7 54 24.8 54 41.3 32 54 32 54Z" />
     </svg>
   )
 }
@@ -450,51 +484,54 @@ function GamePage() {
     startGame()
   }
 
-  const heroClassName = step === 'book' ? 'game-hero game-hero-book' : `game-hero game-hero-compact${step === 'play' || step === 'results' ? ' game-hero-minimal' : ''}`
   const selectedSourceTitle = getSourceTitle(selectedSource)
-  const isCompactPlayHeader = step === 'play' || step === 'results'
-  const heroTitle = step === 'book'
-    ? 'Nostalgic Decades Trivia'
-    : isCompactPlayHeader
-      ? selectedSourceTitle
-      : 'Your decade challenge is underway.'
-  const heroDescription = selectedSource
-    ? isCompactPlayHeader
-      ? selectedMode?.name || 'Keep the questions moving.'
-      : selectedSectionKey
-        ? `${selectedSourceTitle} · ${selectedSectionKey}`
-        : selectedSourceTitle
-    : 'Choose a book, follow the path, and keep the questions moving.'
+  const stepLabels = {
+    book: 'Pick a book',
+    section: 'Pick sections',
+    mode: 'Pick a challenge',
+    play: selectedMode?.shortName || 'Challenge',
+    results: 'Game over'
+  }
+  const stepOrder = ['book', 'section', 'mode']
+  const activeStepIndex = Math.max(0, stepOrder.indexOf(step))
 
   return (
     <section className="game-page">
-      <div className={heroClassName}>
-        <p className="game-eyebrow">Nostalgic Decades Trivia</p>
-        <div className={selectedSource ? 'game-hero-playing' : ''}>
-          <div>
-            <h2>{heroTitle}</h2>
-            <p>
-              {step === 'book'
-                ? 'Pick a decade volume, follow Book → Section → Challenge, then test what you remember.'
-                : heroDescription}
-            </p>
+      <div className="game-arcade-frame">
+        <header className="game-arcade-header">
+          <button
+            className="game-back-button"
+            type="button"
+            onClick={step === 'book' ? undefined : step === 'section' ? chooseAnotherBook : chooseAnotherSection}
+            aria-label="Go back"
+            disabled={step === 'book' || step === 'play'}
+          >
+            ←
+          </button>
+          <div className="game-title-lockup">
+            <p className="game-eyebrow">Nostalgic Decades Trivia</p>
+            <h2>{stepLabels[step]}</h2>
           </div>
-        </div>
-      </div>
+          <img className="game-mascot" src="/images/brand/lenny-lenski-peek.png" alt="Lenny Lenski" />
+        </header>
 
       {error ? <p className="game-error">{error}</p> : null}
 
       {step !== 'play' && step !== 'results' ? (
         <ol className="game-stepper" aria-label="Game setup steps">
-          <li className={step === 'book' ? 'game-step-active' : ''}>
-            <span>1</span>Book
-          </li>
-          <li className={step === 'section' ? 'game-step-active' : ''}>
-            <span>2</span>Section
-          </li>
-          <li className={step === 'mode' ? 'game-step-active' : ''}>
-            <span>3</span>Challenge
-          </li>
+          {[
+            ['01', 'Books'],
+            ['02', 'Sections'],
+            ['03', 'Challenge']
+          ].map(([number, label], index) => (
+            <li
+              className={index < activeStepIndex ? 'game-step-complete' : index === activeStepIndex ? 'game-step-active' : ''}
+              key={label}
+            >
+              <span className="game-step-line" aria-hidden="true" />
+              <span className="game-step-copy"><b>{number}</b> · {label}</span>
+            </li>
+          ))}
         </ol>
       ) : null}
 
@@ -556,9 +593,23 @@ function GamePage() {
 
       {step === 'section' ? (
         <div className="game-panel">
+          {selectedSource ? (
+            <div className="selected-book-banner">
+              <div className="selected-book-cover">
+                {getCoverImageUrl(selectedSource, 'medium') ? (
+                  <img src={getCoverImageUrl(selectedSource, 'medium')} alt={`${selectedSourceTitle} cover`} />
+                ) : null}
+              </div>
+              <div>
+                <p className="game-eyebrow">Now reading</p>
+                <h3>{selectedSourceTitle}</h3>
+              </div>
+            </div>
+          ) : null}
+
           <div className="game-panel-heading">
-            <p className="game-eyebrow">Step 2 · Pick a chapter path</p>
-            <h3>Choose a section</h3>
+            <p className="game-eyebrow">Pick · Any · Combo</p>
+            <h3>What grabs you?</h3>
           </div>
 
           {isLoadingQuestions ? <p>Loading sections...</p> : null}
@@ -593,8 +644,8 @@ function GamePage() {
       {step === 'mode' ? (
         <div className="game-panel">
           <div className="game-panel-heading">
-            <p className="game-eyebrow">Step 3 · Set the rules</p>
-            <h3>Choose your challenge</h3>
+            <p className="game-eyebrow">Last step</p>
+            <h3>Pick your challenge</h3>
           </div>
 
           <div className="mode-card-grid">
@@ -605,7 +656,7 @@ function GamePage() {
                 type="button"
                 onClick={() => handleChooseMode(mode.id)}
               >
-                <span className="mode-card-icon" aria-hidden="true">{mode.icon}</span>
+                <span className="mode-card-icon" aria-hidden="true"><ChallengeIcon type={mode.icon} /></span>
                 <span className="mode-card-tagline">{mode.tagline}</span>
                 <strong>{mode.name}</strong>
                 <small>{mode.description}</small>
@@ -630,20 +681,24 @@ function GamePage() {
       {step === 'play' && currentQuestion ? (
         <div className="play-screen">
           <div className="play-status-bar">
+            <button className="play-exit-button" type="button" onClick={chooseAnotherSection} aria-label="Exit challenge">×</button>
             <div>
-              <span>{selectedMode?.shortName}</span>
+              <span>{selectedModeId === GAME_MODES.sprint.id ? 'Timer' : 'Lives'}</span>
               <strong>
                 {selectedModeId === GAME_MODES.sprint.id
                   ? `${secondsRemaining}s`
-                  : `${livesRemaining} ${livesRemaining === 1 ? 'life' : 'lives'}`}
+                  : '♥'.repeat(livesRemaining)}
               </strong>
             </div>
             <div>
               <span>Score</span>
               <strong>
-                {correctCount}/{attemptedCount} correct
+                {correctCount}/{attemptedCount}
               </strong>
             </div>
+          </div>
+          <div className="play-progress-track" aria-hidden="true">
+            <span style={{ width: `${Math.min(100, Math.max(8, ((currentQuestionIndex + 1) / Math.max(1, questionQueue.length)) * 100))}%` }} />
           </div>
 
           <article className="question-card">
@@ -706,7 +761,9 @@ function GamePage() {
       {step === 'results' && results ? (
         <div className="results-screen">
           <p className="game-eyebrow">Challenge complete</p>
-          <h3>{results.percentCorrect}% correct</h3>
+          <div className="result-stars" aria-hidden="true">★★★</div>
+          <h3><span>{results.percentCorrect}</span>%</h3>
+          <p className="results-scoreline">{results.correctCount} of {results.attemptedCount} correct</p>
           <p className="results-summary">{getResultMessage(results.percentCorrect)}</p>
           <dl className="results-list">
             <div>
@@ -748,6 +805,7 @@ function GamePage() {
           </div>
         </div>
       ) : null}
+      </div>
     </section>
   )
 }
