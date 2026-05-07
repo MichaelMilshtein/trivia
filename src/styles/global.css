@@ -606,10 +606,13 @@ body {
   border-radius: 0.7rem;
   background: #0f172a;
   color: #ffffff;
-  font-size: 1rem;
-  font-weight: 900;
   transform: translateY(-50%);
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.16);
+}
+
+.section-card-icon {
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 .section-card-title,

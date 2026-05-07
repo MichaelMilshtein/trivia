@@ -95,8 +95,107 @@ function getResultMessage(percentCorrect) {
   return 'Try another pass and chase a higher score.'
 }
 
-function getSectionIcon(index) {
-  return ['📻', '🎞️', '🎙️', '🕺', '📺', '💿', '🎮', '⭐'][index % 8]
+function getSectionIconType(sectionKey, index) {
+  const normalizedSection = sectionKey.toLowerCase()
+
+  if (normalizedSection.includes('culture')) {
+    return 'culture'
+  }
+
+  if (normalizedSection.includes('entertainment')) {
+    return 'entertainment'
+  }
+
+  if (normalizedSection.includes('food')) {
+    return 'food'
+  }
+
+  if (normalizedSection.includes('technology') || normalizedSection.includes('tech')) {
+    return 'technology'
+  }
+
+  if (normalizedSection.includes('world') || normalizedSection.includes('event')) {
+    return 'worldEvents'
+  }
+
+  return ['culture', 'entertainment', 'food', 'technology', 'worldEvents'][index % 5]
+}
+
+function SectionIcon({ type }) {
+  const commonProps = {
+    className: 'section-card-icon',
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: '1.8',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  }
+
+  if (type === 'culture') {
+    return (
+      <svg {...commonProps}>
+        <path d="M4 9h16" />
+        <path d="M5.5 19h13" />
+        <path d="M7 9v8" />
+        <path d="M12 9v8" />
+        <path d="M17 9v8" />
+        <path d="M12 4 5 9h14l-7-5Z" />
+      </svg>
+    )
+  }
+
+  if (type === 'entertainment') {
+    return (
+      <svg {...commonProps}>
+        <rect x="4" y="5" width="16" height="14" rx="2" />
+        <path d="M8 5v14" />
+        <path d="M16 5v14" />
+        <path d="M4 10h16" />
+        <path d="M4 14h16" />
+      </svg>
+    )
+  }
+
+  if (type === 'food') {
+    return (
+      <svg {...commonProps}>
+        <path d="M7 4v16" />
+        <path d="M4.5 4v5a2.5 2.5 0 0 0 5 0V4" />
+        <path d="M15 4v16" />
+        <path d="M15 4c3 1.4 4.5 4 4.5 7.5H15" />
+      </svg>
+    )
+  }
+
+  if (type === 'technology') {
+    return (
+      <svg {...commonProps}>
+        <rect x="7" y="7" width="10" height="10" rx="2" />
+        <path d="M10 10h4v4h-4z" />
+        <path d="M9 3v4" />
+        <path d="M15 3v4" />
+        <path d="M9 17v4" />
+        <path d="M15 17v4" />
+        <path d="M3 9h4" />
+        <path d="M3 15h4" />
+        <path d="M17 9h4" />
+        <path d="M17 15h4" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg {...commonProps}>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M4 12h16" />
+      <path d="M12 4a12 12 0 0 1 0 16" />
+      <path d="M12 4a12 12 0 0 0 0 16" />
+      <path d="M15 15h5v5h-5z" />
+      <path d="M16.5 17h2" />
+    </svg>
+  )
 }
 
 function GamePage() {
@@ -473,7 +572,9 @@ function GamePage() {
                   type="button"
                   onClick={() => handleChooseSection(section.key)}
                 >
-                  <span className="section-card-mark" aria-hidden="true">{getSectionIcon(index)}</span>
+                  <span className="section-card-mark" aria-hidden="true">
+                    <SectionIcon type={getSectionIconType(section.key, index)} />
+                  </span>
                   <span className="section-card-title">{section.key}</span>
                   <small>{section.questionCount} questions</small>
                 </button>
