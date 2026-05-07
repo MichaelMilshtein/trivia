@@ -487,7 +487,7 @@ function GamePage() {
   const selectedSourceTitle = getSourceTitle(selectedSource)
   const stepLabels = {
     book: 'Pick a book',
-    section: 'Pick sections',
+    section: 'Pick a section',
     mode: 'Pick a challenge',
     play: selectedMode?.shortName || 'Challenge',
     results: 'Game over'
@@ -512,7 +512,6 @@ function GamePage() {
             <p className="game-eyebrow">Nostalgic Decades Trivia</p>
             <h2>{stepLabels[step]}</h2>
           </div>
-          <img className="game-mascot" src="/images/brand/lenny-lenski-peek.png" alt="Lenny Lenski" />
         </header>
 
       {error ? <p className="game-error">{error}</p> : null}
@@ -539,7 +538,6 @@ function GamePage() {
         <div className="game-panel">
           <div className="game-panel-heading">
             <p className="game-eyebrow">Step 1 · Library shelf</p>
-            <h3>Choose your book</h3>
             <p>Tap a cover to open that book’s question shelves.</p>
           </div>
 
@@ -608,8 +606,7 @@ function GamePage() {
           ) : null}
 
           <div className="game-panel-heading">
-            <p className="game-eyebrow">Pick · Any · Combo</p>
-            <h3>What grabs you?</h3>
+            <p className="game-eyebrow">Step 2 · Pick any topic</p>
           </div>
 
           {isLoadingQuestions ? <p>Loading sections...</p> : null}
@@ -644,8 +641,7 @@ function GamePage() {
       {step === 'mode' ? (
         <div className="game-panel">
           <div className="game-panel-heading">
-            <p className="game-eyebrow">Last step</p>
-            <h3>Pick your challenge</h3>
+            <p className="game-eyebrow">Step 3 · Last step</p>
           </div>
 
           <div className="mode-card-grid">
