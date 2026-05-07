@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { getCoverVariantPath } from '../lib/bookCovers'
 import { selectFrom } from '../lib/supabaseClient'
 
 const GAME_MODES = {
@@ -48,8 +49,12 @@ function getSectionKey(question) {
   return question.section?.trim() || 'General'
 }
 
-function getCoverImageUrl(source) {
+function getBaseCoverImageUrl(source) {
   return source?.front_cover_image_url || source?.back_cover_image_url || ''
+}
+
+function getCoverImageUrl(source, variant) {
+  return getCoverVariantPath(getBaseCoverImageUrl(source), variant)
 }
 
 function getChoiceEntries(question) {
@@ -347,7 +352,6 @@ function GamePage() {
   }
 
   const heroClassName = step === 'book' ? 'game-hero game-hero-book' : `game-hero game-hero-compact${step === 'play' || step === 'results' ? ' game-hero-minimal' : ''}`
-  const selectedSourceCoverImageUrl = getCoverImageUrl(selectedSource)
   const selectedSourceTitle = getSourceTitle(selectedSource)
   const heroDescription = selectedSource
     ? selectedSectionKey
@@ -360,11 +364,6 @@ function GamePage() {
       <div className={heroClassName}>
         <p className="game-eyebrow">Book trivia</p>
         <div className={selectedSource ? 'game-hero-playing' : ''}>
-          {selectedSource ? (
-            <div className="game-hero-cover" aria-hidden="true">
-              {selectedSourceCoverImageUrl ? <img src={selectedSourceCoverImageUrl} alt="" /> : <span>Book</span>}
-            </div>
-          ) : null}
           <div>
             <h2>{step === 'book' ? 'Pull a book from the trivia shelf.' : step === 'play' || step === 'results' ? 'You are playing' : 'Your reading challenge is underway.'}</h2>
             <p>
@@ -399,7 +398,8 @@ function GamePage() {
           {!isLoadingSources && sources.length > 0 ? (
             <div className="book-card-grid" aria-label="Available trivia books">
               {sources.map((source) => {
-                const coverImageUrl = getCoverImageUrl(source)
+                const baseCoverImageUrl = getBaseCoverImageUrl(source)
+                const coverImageUrl = getCoverImageUrl(source, 'medium')
 
                 return (
                   <button
@@ -410,7 +410,17 @@ function GamePage() {
                   >
                     <div className="book-cover-frame">
                       {coverImageUrl ? (
-                        <img src={coverImageUrl} alt={`${getSourceTitle(source)} cover`} loading="lazy" />
+                        <img
+                          src={coverImageUrl}
+                          alt={`${getSourceTitle(source)} cover`}
+                          loading="lazy"
+                          onError={(event) => {
+                            if (baseCoverImageUrl && !event.currentTarget.dataset.coverFallbackApplied) {
+                              event.currentTarget.dataset.coverFallbackApplied = 'true'
+                              event.currentTarget.src = baseCoverImageUrl
+                            }
+                          }}
+                        />
                       ) : (
                         <span>No cover yet</span>
                       )}
