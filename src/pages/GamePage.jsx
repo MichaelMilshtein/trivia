@@ -529,7 +529,7 @@ function GamePage() {
               className={index < activeStepIndex ? 'game-step-complete' : index === activeStepIndex ? 'game-step-active' : ''}
               key={label}
             >
-              <span className="game-step-label">{label}</span>
+              {label}
             </li>
           ))}
         </ol>
