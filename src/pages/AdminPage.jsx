@@ -19,9 +19,10 @@ const QUESTION_MATRIX_SECTION_ORDER = [
   'Bonus Pages'
 ]
 const UNSECTIONED_QUESTION_LABEL = 'Unsectioned'
+const QUESTION_MATRIX_PAGE_SIZE = 1000
 
 function getSourceSortTitle(source) {
-  return (source.short_title || source.full_title || '').toLowerCase()
+  return (source.short_title || '').toLowerCase()
 }
 
 function compareSourcesByDisplayOrderThenTitle(sourceA, sourceB) {
@@ -437,13 +438,27 @@ function AdminPage() {
     setQuestionMatrixError('')
 
     try {
-      const rows = await selectFrom('questions', {
-        columns: 'id,is_active,source_id,section',
-        filters: {
-          is_active: 'eq.true'
-        }
-      })
-      setQuestionMatrixQuestions(rows)
+      const activeQuestionRows = []
+      let offset = 0
+      let hasMoreQuestions = true
+
+      while (hasMoreQuestions) {
+        const questionPage = await selectFrom('questions', {
+          columns: 'id,is_active,source_id,section',
+          filters: {
+            is_active: 'eq.true',
+            order: 'id.asc',
+            limit: String(QUESTION_MATRIX_PAGE_SIZE),
+            offset: String(offset)
+          }
+        })
+
+        activeQuestionRows.push(...questionPage)
+        hasMoreQuestions = questionPage.length === QUESTION_MATRIX_PAGE_SIZE
+        offset += QUESTION_MATRIX_PAGE_SIZE
+      }
+
+      setQuestionMatrixQuestions(activeQuestionRows)
     } catch (err) {
       setQuestionMatrixError(
         err instanceof Error ? err.message : 'Failed to load question matrix.'
@@ -1100,7 +1115,7 @@ function AdminPage() {
                       <th scope="col">Section</th>
                       {questionMatrix.activeSources.map((source) => (
                         <th key={source.id} scope="col">
-                          {source.short_title || source.full_title || 'Untitled source'}
+                          {source.short_title || 'Untitled source'}
                         </th>
                       ))}
                       <th scope="col">Row total</th>
