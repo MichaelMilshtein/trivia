@@ -485,6 +485,9 @@ function GamePage() {
   }
 
   const selectedSourceTitle = getSourceTitle(selectedSource)
+  const selectedSourceBaseCoverUrl = selectedSource ? getBaseCoverImageUrl(selectedSource) : ''
+  const selectedSourceThumbnailUrl = selectedSource ? getCoverImageUrl(selectedSource, 'small') : ''
+  const selectedSourceCoverUrl = selectedSource ? getCoverImageUrl(selectedSource, 'medium') : ''
   const stepLabels = {
     book: 'Pick a book',
     section: 'Pick a section',
@@ -519,15 +522,14 @@ function GamePage() {
       {step !== 'play' && step !== 'results' ? (
         <ol className="game-stepper" aria-label="Game setup steps">
           {[
-            ['01', 'Book'],
-            ['02', 'Section'],
-            ['03', 'Challenge']
-          ].map(([number, label], index) => (
+            'Book',
+            'Section',
+            'Challenge'
+          ].map((label, index) => (
             <li
               className={index < activeStepIndex ? 'game-step-complete' : index === activeStepIndex ? 'game-step-active' : ''}
               key={label}
             >
-              <span className="game-step-number">{number}</span>
               <span className="game-step-label">{label}</span>
             </li>
           ))}
@@ -594,8 +596,17 @@ function GamePage() {
           {selectedSource ? (
             <div className="selected-book-banner">
               <div className="selected-book-cover">
-                {getCoverImageUrl(selectedSource, 'medium') ? (
-                  <img src={getCoverImageUrl(selectedSource, 'medium')} alt={`${selectedSourceTitle} cover`} />
+                {selectedSourceCoverUrl ? (
+                  <img
+                    src={selectedSourceCoverUrl}
+                    alt={`${selectedSourceTitle} cover`}
+                    onError={(event) => {
+                      if (selectedSourceBaseCoverUrl && !event.currentTarget.dataset.coverFallbackApplied) {
+                        event.currentTarget.dataset.coverFallbackApplied = 'true'
+                        event.currentTarget.src = selectedSourceBaseCoverUrl
+                      }
+                    }}
+                  />
                 ) : null}
               </div>
               <div>
@@ -696,6 +707,32 @@ function GamePage() {
           <div className="play-progress-track" aria-hidden="true">
             <span style={{ width: `${Math.min(100, Math.max(8, ((currentQuestionIndex + 1) / Math.max(1, questionQueue.length)) * 100))}%` }} />
           </div>
+
+          {selectedSource ? (
+            <div className="question-source-context" aria-label="Question source">
+              {selectedSourceThumbnailUrl ? (
+                <span className="question-source-thumbnail" aria-hidden="true">
+                  <img
+                    src={selectedSourceThumbnailUrl}
+                    alt=""
+                    onError={(event) => {
+                      if (selectedSourceCoverUrl && !event.currentTarget.dataset.coverFallbackApplied) {
+                        event.currentTarget.dataset.coverFallbackApplied = 'true'
+                        event.currentTarget.src = selectedSourceCoverUrl
+                      } else if (selectedSourceBaseCoverUrl && !event.currentTarget.dataset.baseCoverFallbackApplied) {
+                        event.currentTarget.dataset.baseCoverFallbackApplied = 'true'
+                        event.currentTarget.src = selectedSourceBaseCoverUrl
+                      }
+                    }}
+                  />
+                </span>
+              ) : null}
+              <span>
+                <span className="question-source-label">Source</span>
+                <strong>{selectedSourceTitle}</strong>
+              </span>
+            </div>
+          ) : null}
 
           <article className="question-card">
             <div className="question-pill-row">
