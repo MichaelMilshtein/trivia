@@ -15,7 +15,7 @@ const GAME_MODES = {
   lives: {
     id: 'lives',
     name: 'Three Lives Challenge',
-    shortName: 'Three Lives',
+    shortName: 'Three lives',
     tagline: 'Protect your streak',
     description: 'No timer. Your third wrong answer ends the game.',
     statusLabel: 'Lives',
@@ -658,14 +658,16 @@ function GamePage() {
   const selectedSourceBaseCoverUrl = selectedSource ? getBaseCoverImageUrl(selectedSource) : ''
   const selectedSourceCoverUrl = selectedSource ? getCoverImageUrl(selectedSource, 'medium') : ''
   const stepLabels = {
-    book: 'Pick books',
-    section: 'Pick sections',
-    mode: 'Pick a challenge',
+    book: 'Pick your books',
+    section: 'Choose your areas of expertise',
+    mode: 'Select a challenge',
     play: selectedMode?.shortName || 'Challenge',
     results: 'Game over'
   }
   const stepOrder = ['book', 'section', 'mode']
   const activeStepIndex = Math.max(0, stepOrder.indexOf(step))
+  const isOutOfLivesFeedback =
+    selectedModeId === GAME_MODES.lives.id && selectedAnswerIndex !== null && !lastAnswerWasCorrect && livesRemaining === 0
 
   return (
     <section className="game-page">
@@ -681,7 +683,6 @@ function GamePage() {
             ←
           </button>
           <div className="game-title-lockup">
-            <p className="game-eyebrow">Nostalgic Decades Trivia</p>
             <h2>{stepLabels[step]}</h2>
           </div>
         </header>
@@ -708,8 +709,7 @@ function GamePage() {
       {step === 'book' ? (
         <div className="game-panel">
           <div className="game-panel-heading">
-            <p className="game-eyebrow">Step 1 · Library shelf</p>
-            <p>Tap one or more covers, then continue to choose a shared topic shelf.</p>
+            <p>Tap one or more covers to design your next challenge</p>
           </div>
 
           {isLoadingSources ? <p>Loading books...</p> : null}
@@ -758,7 +758,7 @@ function GamePage() {
             onClick={continueWithSelectedSources}
             disabled={!selectedSourceCount || isLoadingQuestions}
           >
-            {selectedSourceCount === 1 ? 'Continue with 1 book' : `Continue with ${selectedSourceCount} books`}
+            {selectedSourceCount ? (selectedSourceCount === 1 ? 'Continue with 1 book' : `Continue with ${selectedSourceCount} books`) : 'Pick at least one book to continue'}
           </button>
           {isLoadingQuestions ? <p>Loading sections...</p> : null}
         </div>
@@ -787,8 +787,7 @@ function GamePage() {
           ) : null}
 
           <div className="game-panel-heading">
-            <p className="game-eyebrow">Step 2 · Pick any topics</p>
-            <p>Select one or more public sections, then choose your challenge.</p>
+            <p>Select one or more sections, then choose your challenge.</p>
           </div>
 
           {isLoadingQuestions ? <p>Loading sections...</p> : null}
@@ -833,10 +832,6 @@ function GamePage() {
 
       {step === 'mode' ? (
         <div className="game-panel">
-          <div className="game-panel-heading">
-            <p className="game-eyebrow">Step 3 · Last step</p>
-          </div>
-
           <div className="mode-card-grid">
             {Object.values(GAME_MODES).map((mode) => (
               <button
@@ -940,17 +935,16 @@ function GamePage() {
               })}
             </div>
 
-            {selectedAnswerIndex !== null ? (
-              <div className={lastAnswerWasCorrect ? 'answer-feedback correct' : 'answer-feedback incorrect'}>
-                <strong>{lastAnswerWasCorrect ? 'Correct!' : 'Not quite.'}</strong>
-                {shouldEndAfterFeedback ? <span>Review your result when you are ready.</span> : null}
-              </div>
-            ) : null}
           </article>
 
           {selectedAnswerIndex !== null ? (
-            <button className="game-primary-button" type="button" onClick={moveToNextQuestion}>
-              {shouldEndAfterFeedback ? 'Show results' : 'Next question'}
+            <button
+              className={`game-primary-button answer-next-button ${lastAnswerWasCorrect ? 'answer-next-button-correct' : 'answer-next-button-incorrect'} ${isOutOfLivesFeedback ? 'answer-next-button-final-life' : ''}`}
+              type="button"
+              onClick={moveToNextQuestion}
+            >
+              <span>{lastAnswerWasCorrect ? 'Correct!' : 'Not quite!'}</span>
+              <span className="answer-next-action">{isOutOfLivesFeedback ? 'You are out of lives' : 'Next question'}</span>
             </button>
           ) : null}
         </div>

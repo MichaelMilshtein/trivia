@@ -1509,6 +1509,35 @@ body {
   box-shadow: none;
 }
 
+.answer-next-button {
+  justify-content: flex-start;
+  gap: 0.75rem;
+}
+
+.answer-next-button .answer-next-action {
+  margin-left: auto;
+}
+
+.answer-next-button::after {
+  margin-left: 0.45rem;
+}
+
+.answer-next-button-correct {
+  background: linear-gradient(180deg, #16a34a, #15803d);
+  color: #ffffff;
+  box-shadow: 0 14px 30px rgba(22, 163, 74, 0.22);
+}
+
+.answer-next-button-incorrect {
+  background: linear-gradient(180deg, #ffd5e2, #ffc2d5);
+  color: #7f1d1d;
+  box-shadow: 0 14px 30px rgba(255, 91, 145, 0.16);
+}
+
+.answer-next-button-final-life::after {
+  content: none;
+}
+
 .play-screen,
 .results-screen {
   max-width: 680px;
