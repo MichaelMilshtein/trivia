@@ -27,6 +27,13 @@ const SPRINT_SECONDS = 20
 const MAX_MISTAKES_IN_LIVES_MODE = 2
 const SHOW_CORRECT_ANSWER_DEBUG = true
 const CHOICE_KEYS = ['A', 'B', 'C', 'D']
+const SOURCE_PILL_CLASS_NAMES = {
+  'The Booming 50s': 'source-pill-50s',
+  'The Swinging 60s': 'source-pill-60s',
+  'The Groovy 70s': 'source-pill-70s',
+  'The Neon 80s': 'source-pill-80s',
+  'The Mighty 90s': 'source-pill-90s'
+}
 
 function shuffleItems(items) {
   const shuffled = [...items]
@@ -43,6 +50,10 @@ function shuffleItems(items) {
 
 function getSourceTitle(source) {
   return source?.short_title || source?.full_title || 'Untitled book'
+}
+
+function getSourcePillClassName(sourceTitle) {
+  return ['source-pill', SOURCE_PILL_CLASS_NAMES[sourceTitle] || 'source-pill-default'].join(' ')
 }
 
 function getSectionKey(question) {
@@ -779,20 +790,17 @@ function GamePage() {
             <span style={{ width: `${Math.min(100, Math.max(8, ((currentQuestionIndex + 1) / Math.max(1, questionQueue.length)) * 100))}%` }} />
           </div>
 
-          {currentQuestion ? (
-            <p className="question-source-context" aria-label="Question source">
-              This question comes from <strong>{currentQuestionSourceTitle}</strong>.
-            </p>
-          ) : null}
-
           <article className="question-card">
-            <div className="question-pill-row">
-              {categoriesById[String(currentQuestion.category_id)] ? (
-                <span className="category-pill">{categoriesById[String(currentQuestion.category_id)]}</span>
-              ) : null}
-              {currentQuestion.difficulty ? (
-                <span className="difficulty-pill">{currentQuestion.difficulty}</span>
-              ) : null}
+            <div className="question-pill-row" aria-label="Question metadata">
+              <span className={getSourcePillClassName(currentQuestionSourceTitle)}>{currentQuestionSourceTitle}</span>
+              <span className="question-detail-pill-group">
+                {categoriesById[String(currentQuestion.category_id)] ? (
+                  <span className="category-pill">{categoriesById[String(currentQuestion.category_id)]}</span>
+                ) : null}
+                {currentQuestion.difficulty ? (
+                  <span className="difficulty-pill">{currentQuestion.difficulty}</span>
+                ) : null}
+              </span>
             </div>
             <p className="question-count-label">
               Question {currentQuestionIndex + 1}
