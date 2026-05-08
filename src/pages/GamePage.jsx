@@ -57,6 +57,16 @@ function getCoverImageUrl(source, variant) {
   return getCoverVariantPath(getBaseCoverImageUrl(source), variant)
 }
 
+function handleCoverImageError(event, fallbackImageUrl) {
+  if (fallbackImageUrl && !event.currentTarget.dataset.coverFallbackApplied) {
+    event.currentTarget.dataset.coverFallbackApplied = 'true'
+    event.currentTarget.src = fallbackImageUrl
+    return
+  }
+
+  event.currentTarget.hidden = true
+}
+
 function getChoiceEntries(question) {
   if (question.shuffledChoices) {
     return question.shuffledChoices.map((choice, displayIndex) => ({
@@ -563,12 +573,7 @@ function GamePage() {
                           src={coverImageUrl}
                           alt={`${getSourceTitle(source)} cover`}
                           loading="lazy"
-                          onError={(event) => {
-                            if (baseCoverImageUrl && !event.currentTarget.dataset.coverFallbackApplied) {
-                              event.currentTarget.dataset.coverFallbackApplied = 'true'
-                              event.currentTarget.src = baseCoverImageUrl
-                            }
-                          }}
+                          onError={(event) => handleCoverImageError(event, baseCoverImageUrl)}
                         />
                       ) : (
                         <span>No cover yet</span>
@@ -599,12 +604,7 @@ function GamePage() {
                   <img
                     src={selectedSourceCoverUrl}
                     alt={`${selectedSourceTitle} cover`}
-                    onError={(event) => {
-                      if (selectedSourceBaseCoverUrl && !event.currentTarget.dataset.coverFallbackApplied) {
-                        event.currentTarget.dataset.coverFallbackApplied = 'true'
-                        event.currentTarget.src = selectedSourceBaseCoverUrl
-                      }
-                    }}
+                    onError={(event) => handleCoverImageError(event, selectedSourceBaseCoverUrl)}
                   />
                 ) : null}
               </div>
@@ -790,18 +790,28 @@ function GamePage() {
             <p className="game-eyebrow">Lenny Lenski library</p>
             <h3 id="book-promo-heading">Keep playing through the decades</h3>
             <p>
-              This challenge is based on Lenny Lenski’s Nostalgic Decades puzzle books — packed with trivia,
-              word searches, crosswords, brain teasers, jokes, and more.
+              This challenge is based on Lenny Lenski’s puzzle books — packed with trivia, word searches,
+              crosswords, brain teasers, jokes, and more. Tap on each cover to learn more.
             </p>
 
             <div className="book-promo-grid" aria-label="Active Lenny Lenski books">
               {sources.map((source) => {
-                const coverImageUrl = getCoverImageUrl(source, 'small')
+                const baseCoverImageUrl = source.front_cover_image_url || ''
+                const coverImageUrl = getCoverVariantPath(baseCoverImageUrl, 'small')
                 const bookTitle = getSourceTitle(source)
                 const bookContent = (
                   <>
                     <span className="book-promo-cover">
-                      {coverImageUrl ? <img src={coverImageUrl} alt={`${bookTitle} cover`} loading="lazy" /> : <span>No cover</span>}
+                      {coverImageUrl ? (
+                        <img
+                          src={coverImageUrl}
+                          alt={`${bookTitle} cover`}
+                          loading="lazy"
+                          onError={(event) => handleCoverImageError(event, baseCoverImageUrl)}
+                        />
+                      ) : (
+                        <span>No cover</span>
+                      )}
                     </span>
                     <span className="book-promo-title">{bookTitle}</span>
                   </>
