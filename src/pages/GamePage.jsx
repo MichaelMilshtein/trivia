@@ -465,13 +465,13 @@ function GamePage() {
   }
 
   function buildResults(nextCorrectCount = correctCount, nextAttemptedCount = attemptedCount) {
+    const playedSourceIds = [...new Set(questionQueue.map((question) => String(question.source_id)))]
+
     return {
-      challengeName: GAME_MODES[selectedModeId]?.name || 'Trivia game',
-      sourceTitle: selectedSources.length === 1 ? getSourceTitle(selectedSources[0]) : `${selectedSources.length} books selected`,
-      sectionName: selectedSectionKey || 'General',
       correctCount: nextCorrectCount,
       attemptedCount: nextAttemptedCount,
-      percentCorrect: nextAttemptedCount ? Math.round((nextCorrectCount / nextAttemptedCount) * 100) : 0
+      percentCorrect: nextAttemptedCount ? Math.round((nextCorrectCount / nextAttemptedCount) * 100) : 0,
+      playedSourceIds
     }
   }
 
@@ -857,20 +857,6 @@ function GamePage() {
             <div className="result-stars" aria-hidden="true">★★★</div>
             <h3><span>{results.percentCorrect}</span>%</h3>
             <p className="results-scoreline">{results.correctCount} of {results.attemptedCount} correct</p>
-            <dl className="results-list results-meta-list">
-              <div>
-                <dt>Books</dt>
-                <dd>{results.sourceTitle}</dd>
-              </div>
-              <div>
-                <dt>Section</dt>
-                <dd>{results.sectionName}</dd>
-              </div>
-              <div>
-                <dt>Challenge</dt>
-                <dd>{results.challengeName}</dd>
-              </div>
-            </dl>
             <p className="results-summary">{getResultMessage(results.percentCorrect)}</p>
 
             <div className="result-actions">
@@ -893,9 +879,11 @@ function GamePage() {
                 const baseCoverImageUrl = source.front_cover_image_url || ''
                 const coverImageUrl = getCoverVariantPath(baseCoverImageUrl, 'small')
                 const bookTitle = getSourceTitle(source)
+                const wasPlayed = results.playedSourceIds.includes(String(source.id))
                 const bookContent = (
                   <>
                     <span className="book-promo-cover">
+                      {wasPlayed ? <span className="book-promo-played-badge">Played</span> : null}
                       {coverImageUrl ? (
                         <img
                           src={coverImageUrl}
