@@ -486,7 +486,6 @@ function GamePage() {
 
   const selectedSourceTitle = getSourceTitle(selectedSource)
   const selectedSourceBaseCoverUrl = selectedSource ? getBaseCoverImageUrl(selectedSource) : ''
-  const selectedSourceThumbnailUrl = selectedSource ? getCoverImageUrl(selectedSource, 'small') : ''
   const selectedSourceCoverUrl = selectedSource ? getCoverImageUrl(selectedSource, 'medium') : ''
   const stepLabels = {
     book: 'Pick a book',
@@ -709,29 +708,9 @@ function GamePage() {
           </div>
 
           {selectedSource ? (
-            <div className="question-source-context" aria-label="Question source">
-              {selectedSourceThumbnailUrl ? (
-                <span className="question-source-thumbnail" aria-hidden="true">
-                  <img
-                    src={selectedSourceThumbnailUrl}
-                    alt=""
-                    onError={(event) => {
-                      if (selectedSourceCoverUrl && !event.currentTarget.dataset.coverFallbackApplied) {
-                        event.currentTarget.dataset.coverFallbackApplied = 'true'
-                        event.currentTarget.src = selectedSourceCoverUrl
-                      } else if (selectedSourceBaseCoverUrl && !event.currentTarget.dataset.baseCoverFallbackApplied) {
-                        event.currentTarget.dataset.baseCoverFallbackApplied = 'true'
-                        event.currentTarget.src = selectedSourceBaseCoverUrl
-                      }
-                    }}
-                  />
-                </span>
-              ) : null}
-              <span>
-                <span className="question-source-label">Source</span>
-                <strong>{selectedSourceTitle}</strong>
-              </span>
-            </div>
+            <p className="question-source-context" aria-label="Question source">
+              This question comes from <strong>{selectedSourceTitle}</strong>.
+            </p>
           ) : null}
 
           <article className="question-card">
