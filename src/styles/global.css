@@ -1119,8 +1119,12 @@ body {
   border: 1px solid rgba(255, 248, 232, 0.08);
   border-radius: 999px;
   background: rgba(23, 18, 44, 0.34);
-  color: rgba(255, 248, 232, 0.62);
+  color: rgba(255, 248, 232, 0.78);
+  font-size: clamp(0.72rem, 1.7vw, 0.9rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
   text-align: center;
+  white-space: nowrap;
 }
 
 .game-stepper li:not(:last-child)::after {
@@ -1134,23 +1138,6 @@ body {
   border-top: 2px solid rgba(255, 248, 232, 0.48);
   border-right: 2px solid rgba(255, 248, 232, 0.48);
   transform: translateY(-50%) rotate(45deg);
-}
-
-.game-stepper .game-step-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  width: auto;
-  height: auto;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: rgba(255, 248, 232, 0.78);
-  font-size: clamp(0.72rem, 1.7vw, 0.9rem);
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
 }
 
 .game-stepper .game-step-active,
@@ -1726,7 +1713,7 @@ body {
     height: 0.28rem;
   }
 
-  .game-step-label {
+  .game-stepper li {
     font-size: 0.62rem;
     letter-spacing: 0.03em;
   }
