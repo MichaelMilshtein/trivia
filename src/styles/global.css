@@ -1316,6 +1316,7 @@ body {
 .section-card,
 .section-card:nth-child(1),
 .section-card:nth-child(2) {
+  position: relative;
   display: grid;
   grid-template-columns: 2.35rem minmax(0, 1fr);
   grid-template-rows: auto auto;
@@ -1334,6 +1335,34 @@ body {
   border-color: var(--game-yellow);
   background: linear-gradient(145deg, rgba(66, 56, 96, 0.98), rgba(45, 56, 80, 0.98));
   box-shadow: 0 12px 30px rgba(255, 210, 21, 0.12);
+}
+
+
+.section-card-selected {
+  border-color: var(--game-yellow);
+  background: linear-gradient(145deg, rgba(255, 210, 21, 0.2), rgba(38, 45, 70, 0.98));
+  box-shadow: 0 0 0 1px rgba(255, 210, 21, 0.66), 0 12px 30px rgba(255, 210, 21, 0.16);
+}
+
+.section-card-selected::after {
+  content: '✓';
+  position: absolute;
+  right: 0.65rem;
+  top: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  background: var(--game-yellow);
+  color: #17122c;
+  font-weight: 1000;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
+}
+
+.section-card-selected .section-card-title {
+  color: var(--game-yellow);
 }
 
 .section-card::before {
