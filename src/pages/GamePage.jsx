@@ -35,6 +35,27 @@ const SOURCE_PILL_CLASS_NAMES = {
   'The Neon 80s': 'source-pill-80s',
   'The Mighty 90s': 'source-pill-90s'
 }
+const PUBLIC_SECTION_ORDER = [
+  'World Events & Economy',
+  'Culture & Lifestyle',
+  'Entertainment & Media',
+  'Food',
+  'Technology & Innovation',
+  'Mixed Bag'
+]
+const PUBLIC_SECTION_MAPPINGS = {
+  'world events': 'World Events & Economy',
+  'globalization & economy': 'World Events & Economy',
+  culture: 'Culture & Lifestyle',
+  'culture & lifestyle': 'Culture & Lifestyle',
+  entertainment: 'Entertainment & Media',
+  'entertainment & media': 'Entertainment & Media',
+  food: 'Food',
+  technology: 'Technology & Innovation',
+  'technology & innovation': 'Technology & Innovation',
+  'bonus pages': 'Mixed Bag',
+  'decade potpourri': 'Mixed Bag'
+}
 
 async function fetchActiveQuestionsForSources(sourceIds) {
   if (!sourceIds.length) {
@@ -90,6 +111,10 @@ function getSourcePillClassName(sourceTitle) {
 
 function getSectionKey(question) {
   return question.section?.trim() || 'General'
+}
+
+function getPublicSectionKey(question) {
+  return PUBLIC_SECTION_MAPPINGS[getSectionKey(question).toLowerCase()] || ''
 }
 
 function getBaseCoverImageUrl(source) {
@@ -397,21 +422,25 @@ function GamePage() {
   )
 
   const sectionCards = useMemo(() => {
-    const sectionMap = sourceQuestions.reduce((accumulator, question) => {
-      const sectionKey = getSectionKey(question)
-      const existingSection = accumulator.get(sectionKey) || { key: sectionKey, questionCount: 0 }
-      accumulator.set(sectionKey, {
-        ...existingSection,
-        questionCount: existingSection.questionCount + 1
-      })
+    const sectionCountsByKey = sourceQuestions.reduce((accumulator, question) => {
+      const publicSectionKey = getPublicSectionKey(question)
+
+      if (!publicSectionKey) {
+        return accumulator
+      }
+
+      accumulator.set(publicSectionKey, (accumulator.get(publicSectionKey) || 0) + 1)
       return accumulator
     }, new Map())
 
-    return [...sectionMap.values()].sort((sectionA, sectionB) => sectionA.key.localeCompare(sectionB.key))
+    return PUBLIC_SECTION_ORDER.map((sectionKey) => ({
+      key: sectionKey,
+      questionCount: sectionCountsByKey.get(sectionKey) || 0
+    })).filter((section) => section.questionCount > 0)
   }, [sourceQuestions])
 
   const selectedSectionQuestions = useMemo(
-    () => sourceQuestions.filter((question) => getSectionKey(question) === selectedSectionKey),
+    () => sourceQuestions.filter((question) => getPublicSectionKey(question) === selectedSectionKey),
     [selectedSectionKey, sourceQuestions]
   )
 
