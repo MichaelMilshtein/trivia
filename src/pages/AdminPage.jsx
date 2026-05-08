@@ -20,6 +20,23 @@ const QUESTION_MATRIX_SECTION_ORDER = [
 ]
 const UNSECTIONED_QUESTION_LABEL = 'Unsectioned'
 const QUESTION_MATRIX_PAGE_SIZE = 1000
+const QUESTION_MATRIX_SECTION_MAPPINGS = {
+  'world events': 'World Events & Economy',
+  'globalization & economy': 'World Events & Economy',
+  culture: 'Culture & Lifestyle',
+  'culture & lifestyle': 'Culture & Lifestyle',
+  entertainment: 'Entertainment & Media',
+  'entertainment & media': 'Entertainment & Media',
+  food: 'Food',
+  technology: 'Technology & Innovation',
+  'technology & innovation': 'Technology & Innovation',
+  'bonus pages': 'Mixed Bag',
+  'decade potpourri': 'Mixed Bag'
+}
+
+function getQuestionMatrixSectionMapping(sectionName) {
+  return QUESTION_MATRIX_SECTION_MAPPINGS[(sectionName || '').trim().toLowerCase()] || 'Unmapped'
+}
 
 function getSourceSortTitle(source) {
   return (source.short_title || '').toLowerCase()
@@ -236,11 +253,16 @@ function AdminPage() {
       return sectionNameA.localeCompare(sectionNameB)
     })
 
-    const rows = orderedSectionKeys.map((sectionKey) => ({
-      key: sectionKey,
-      label: sectionNamesByKey.get(sectionKey),
-      total: rowTotalsBySection.get(sectionKey) || 0
-    }))
+    const rows = orderedSectionKeys.map((sectionKey) => {
+      const label = sectionNamesByKey.get(sectionKey)
+
+      return {
+        key: sectionKey,
+        label,
+        sectionMapping: getQuestionMatrixSectionMapping(label),
+        total: rowTotalsBySection.get(sectionKey) || 0
+      }
+    })
 
     const grandTotal = Object.values(columnTotalsBySource).reduce(
       (total, sourceTotal) => total + sourceTotal,
@@ -1112,7 +1134,8 @@ function AdminPage() {
                 <table className="admin-simple-table admin-question-matrix-table">
                   <thead>
                     <tr>
-                      <th scope="col">Section</th>
+                      <th scope="col">Book Section</th>
+                      <th scope="col">Section Mapping</th>
                       {questionMatrix.activeSources.map((source) => (
                         <th key={source.id} scope="col">
                           {source.short_title || 'Untitled source'}
@@ -1125,6 +1148,7 @@ function AdminPage() {
                     {questionMatrix.rows.map((sectionRow) => (
                       <tr key={sectionRow.key}>
                         <th scope="row">{sectionRow.label}</th>
+                        <td>{sectionRow.sectionMapping}</td>
                         {questionMatrix.activeSources.map((source) => {
                           const matrixCellKey = `${source.id}::${sectionRow.key}`
                           return (
@@ -1142,6 +1166,7 @@ function AdminPage() {
                   <tfoot>
                     <tr>
                       <th scope="row">Column total</th>
+                      <td aria-label="Section mapping totals not applicable">—</td>
                       {questionMatrix.activeSources.map((source) => (
                         <td key={source.id} className="admin-matrix-number-cell admin-matrix-total-cell">
                           {questionMatrix.columnTotalsBySource[String(source.id)] || 0}
