@@ -35,27 +35,40 @@ const SOURCE_PILL_CLASS_NAMES = {
   'The Neon 80s': 'source-pill-80s',
   'The Mighty 90s': 'source-pill-90s'
 }
-const PUBLIC_SECTION_ORDER = [
-  'World Events & Economy',
-  'Culture & Lifestyle',
-  'Entertainment & Media',
-  'Food',
-  'Technology & Innovation',
-  'Mixed Bag'
+const PUBLIC_SECTION_GROUPS = [
+  {
+    name: 'World Events & Economy',
+    rawSections: ['World Events', 'Globalization & Economy']
+  },
+  {
+    name: 'Culture & Lifestyle',
+    rawSections: ['Culture', 'Culture & Lifestyle']
+  },
+  {
+    name: 'Entertainment & Media',
+    rawSections: ['Entertainment', 'Entertainment & Media']
+  },
+  {
+    name: 'Food',
+    rawSections: ['Food']
+  },
+  {
+    name: 'Technology & Innovation',
+    rawSections: ['Technology', 'Technology & Innovation']
+  },
+  {
+    name: 'Mixed Bag',
+    rawSections: ['Bonus Pages', 'Decade Potpourri']
+  }
 ]
-const PUBLIC_SECTION_MAPPINGS = {
-  'world events': 'World Events & Economy',
-  'globalization & economy': 'World Events & Economy',
-  culture: 'Culture & Lifestyle',
-  'culture & lifestyle': 'Culture & Lifestyle',
-  entertainment: 'Entertainment & Media',
-  'entertainment & media': 'Entertainment & Media',
-  food: 'Food',
-  technology: 'Technology & Innovation',
-  'technology & innovation': 'Technology & Innovation',
-  'bonus pages': 'Mixed Bag',
-  'decade potpourri': 'Mixed Bag'
-}
+const PUBLIC_SECTION_ORDER = PUBLIC_SECTION_GROUPS.map((sectionGroup) => sectionGroup.name)
+const PUBLIC_SECTION_MAPPINGS = PUBLIC_SECTION_GROUPS.reduce((accumulator, sectionGroup) => {
+  sectionGroup.rawSections.forEach((rawSectionName) => {
+    accumulator[rawSectionName.toLowerCase()] = sectionGroup.name
+  })
+
+  return accumulator
+}, {})
 
 async function fetchActiveQuestionsForSources(sourceIds) {
   if (!sourceIds.length) {
