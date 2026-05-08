@@ -1198,6 +1198,7 @@ body {
 }
 
 .book-card {
+  position: relative;
   gap: 0.5rem;
   padding: 0.38rem 0.38rem 0.55rem;
   border: 1px solid rgba(255, 248, 232, 0.12);
@@ -1209,6 +1210,7 @@ body {
 
 .book-card:hover,
 .book-card:focus-visible,
+.book-card-selected,
 .section-card:hover,
 .section-card:focus-visible,
 .mode-card:hover,
@@ -1216,6 +1218,33 @@ body {
   border-color: var(--game-pink);
   box-shadow: 0 10px 28px rgba(255, 91, 145, 0.16);
   transform: translateY(-1px);
+}
+
+.book-card-selected {
+  border-color: var(--game-yellow);
+  background: linear-gradient(180deg, rgba(255, 210, 21, 0.18), rgba(23, 18, 44, 0.56));
+  box-shadow: 0 0 0 1px rgba(255, 210, 21, 0.65), 0 12px 28px rgba(255, 210, 21, 0.12);
+}
+
+.book-card-selected::after {
+  content: '✓';
+  position: absolute;
+  right: 0.65rem;
+  top: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  background: var(--game-yellow);
+  color: #17122c;
+  font-weight: 1000;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+}
+
+.book-card-selected .book-card-title {
+  color: var(--game-yellow);
 }
 
 .book-cover-frame {
@@ -1652,6 +1681,11 @@ body {
 
 .results-summary {
   color: var(--game-cream);
+}
+
+.results-meta-list {
+  margin: 0.85rem 0;
+  text-align: left;
 }
 
 .results-list {

@@ -246,7 +246,7 @@ function GamePage() {
   const [sources, setSources] = useState([])
   const [sourceQuestions, setSourceQuestions] = useState([])
   const [categories, setCategories] = useState([])
-  const [selectedSourceId, setSelectedSourceId] = useState('')
+  const [selectedSourceIds, setSelectedSourceIds] = useState([])
   const [selectedSectionKey, setSelectedSectionKey] = useState('')
   const [selectedModeId, setSelectedModeId] = useState('')
   const [questionQueue, setQuestionQueue] = useState([])
@@ -326,9 +326,20 @@ function GamePage() {
     }
   }, [secondsRemaining, selectedModeId, step])
 
-  const selectedSource = useMemo(
-    () => sources.find((source) => String(source.id) === selectedSourceId),
-    [selectedSourceId, sources]
+  const selectedSources = useMemo(
+    () => sources.filter((source) => selectedSourceIds.includes(String(source.id))),
+    [selectedSourceIds, sources]
+  )
+
+  const selectedSource = selectedSources.length === 1 ? selectedSources[0] : null
+
+  const sourcesById = useMemo(
+    () =>
+      sources.reduce((accumulator, source) => {
+        accumulator[String(source.id)] = source
+        return accumulator
+      }, {}),
+    [sources]
   )
 
   const selectedMode = selectedModeId ? GAME_MODES[selectedModeId] : null
@@ -363,8 +374,27 @@ function GamePage() {
 
   const currentQuestion = questionQueue[currentQuestionIndex]
 
-  async function handleChooseSource(sourceId) {
-    setSelectedSourceId(String(sourceId))
+  function toggleSelectedSource(sourceId) {
+    const sourceIdValue = String(sourceId)
+
+    setSelectedSourceIds((currentSourceIds) =>
+      currentSourceIds.includes(sourceIdValue)
+        ? currentSourceIds.filter((currentSourceId) => currentSourceId !== sourceIdValue)
+        : [...currentSourceIds, sourceIdValue]
+    )
+    setSelectedSectionKey('')
+    setSelectedModeId('')
+    setQuestionQueue([])
+    setSourceQuestions([])
+    setResults(null)
+    setError('')
+  }
+
+  async function continueWithSelectedSources() {
+    if (!selectedSourceIds.length) {
+      return
+    }
+
     setSelectedSectionKey('')
     setSelectedModeId('')
     setQuestionQueue([])
@@ -375,10 +405,10 @@ function GamePage() {
     try {
       const rows = await selectFrom('questions', {
         columns:
-          'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,section,category_id',
+          'id,source_id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,section,category_id',
         filters: {
           is_active: 'eq.true',
-          source_id: `eq.${sourceId}`,
+          source_id: `in.(${selectedSourceIds.join(',')})`,
           question_type: 'eq.mc_single'
         }
       })
@@ -387,7 +417,7 @@ function GamePage() {
       setStep('section')
     } catch (err) {
       setSourceQuestions([])
-      setError(err instanceof Error ? err.message : 'Failed to load questions for this book.')
+      setError(err instanceof Error ? err.message : 'Failed to load questions for the selected books.')
     } finally {
       setIsLoadingQuestions(false)
     }
@@ -406,7 +436,7 @@ function GamePage() {
   }
 
   function startGame() {
-    if (!selectedSource || !selectedSectionKey || !selectedModeId || !selectedSectionQuestions.length) {
+    if (!selectedSourceIds.length || !selectedSectionKey || !selectedModeId || !selectedSectionQuestions.length) {
       return
     }
 
@@ -426,7 +456,7 @@ function GamePage() {
   function buildResults(nextCorrectCount = correctCount, nextAttemptedCount = attemptedCount) {
     return {
       challengeName: GAME_MODES[selectedModeId]?.name || 'Trivia game',
-      sourceTitle: getSourceTitle(selectedSource),
+      sourceTitle: selectedSources.length === 1 ? getSourceTitle(selectedSources[0]) : `${selectedSources.length} books selected`,
       sectionName: selectedSectionKey || 'General',
       correctCount: nextCorrectCount,
       attemptedCount: nextAttemptedCount,
@@ -473,7 +503,7 @@ function GamePage() {
   }
 
   function chooseAnotherBook() {
-    setSelectedSourceId('')
+    setSelectedSourceIds([])
     setSelectedSectionKey('')
     setSelectedModeId('')
     setQuestionQueue([])
@@ -487,18 +517,41 @@ function GamePage() {
     setSelectedModeId('')
     setQuestionQueue([])
     setResults(null)
-    setStep(selectedSourceId ? 'section' : 'book')
+    setStep(selectedSourceIds.length ? 'section' : 'book')
+  }
+
+  function resetGameSetup() {
+    setSelectedSourceIds([])
+    setSelectedSectionKey('')
+    setSelectedModeId('')
+    setQuestionQueue([])
+    setSourceQuestions([])
+    setCurrentQuestionIndex(0)
+    setSelectedAnswerIndex(null)
+    setLastAnswerWasCorrect(null)
+    setCorrectCount(0)
+    setAttemptedCount(0)
+    setLivesRemaining(MAX_MISTAKES_IN_LIVES_MODE + 1)
+    setSecondsRemaining(SPRINT_SECONDS)
+    setShouldEndAfterFeedback(false)
+    setResults(null)
+    setError('')
+    setStep('book')
   }
 
   function playAgain() {
-    startGame()
+    resetGameSetup()
   }
 
-  const selectedSourceTitle = getSourceTitle(selectedSource)
+  const selectedSourceTitle = selectedSource ? getSourceTitle(selectedSource) : ''
+  const selectedSourceCount = selectedSourceIds.length
+  const selectedSourceSummary =
+    selectedSourceCount === 1 && selectedSource ? selectedSourceTitle : `${selectedSourceCount} books selected`
+  const currentQuestionSourceTitle = getSourceTitle(sourcesById[String(currentQuestion?.source_id)])
   const selectedSourceBaseCoverUrl = selectedSource ? getBaseCoverImageUrl(selectedSource) : ''
   const selectedSourceCoverUrl = selectedSource ? getCoverImageUrl(selectedSource, 'medium') : ''
   const stepLabels = {
-    book: 'Pick a book',
+    book: 'Pick books',
     section: 'Pick a section',
     mode: 'Pick a challenge',
     play: selectedMode?.shortName || 'Challenge',
@@ -549,7 +602,7 @@ function GamePage() {
         <div className="game-panel">
           <div className="game-panel-heading">
             <p className="game-eyebrow">Step 1 · Library shelf</p>
-            <p>Tap a cover to open that book’s question shelves.</p>
+            <p>Tap one or more covers, then continue to choose a shared topic shelf.</p>
           </div>
 
           {isLoadingSources ? <p>Loading books...</p> : null}
@@ -562,10 +615,11 @@ function GamePage() {
 
                 return (
                   <button
-                    className="book-card"
+                    className={selectedSourceIds.includes(String(source.id)) ? 'book-card book-card-selected' : 'book-card'}
                     key={source.id}
                     type="button"
-                    onClick={() => handleChooseSource(source.id)}
+                    onClick={() => toggleSelectedSource(source.id)}
+                    aria-pressed={selectedSourceIds.includes(String(source.id))}
                   >
                     <div className="book-cover-frame">
                       {coverImageUrl ? (
@@ -580,7 +634,7 @@ function GamePage() {
                       )}
                     </div>
                     <span className="book-card-copy">
-                      <span className="book-card-kicker">Open volume</span>
+                      <span className="book-card-kicker">{selectedSourceIds.includes(String(source.id)) ? 'Selected' : 'Tap to select'}</span>
                       <span className="book-card-title">{getSourceTitle(source)}</span>
                       {source.author ? <span className="book-card-author">{source.author}</span> : null}
                     </span>
@@ -591,26 +645,36 @@ function GamePage() {
           ) : null}
 
           {!isLoadingSources && !sources.length ? <p>No active books found.</p> : null}
+          <button
+            className="game-primary-button"
+            type="button"
+            onClick={continueWithSelectedSources}
+            disabled={!selectedSourceCount || isLoadingQuestions}
+          >
+            {selectedSourceCount === 1 ? 'Continue with 1 book' : `Continue with ${selectedSourceCount} books`}
+          </button>
           {isLoadingQuestions ? <p>Loading sections...</p> : null}
         </div>
       ) : null}
 
       {step === 'section' ? (
         <div className="game-panel">
-          {selectedSource ? (
+          {selectedSourceCount ? (
             <div className="selected-book-banner">
-              <div className="selected-book-cover">
-                {selectedSourceCoverUrl ? (
-                  <img
-                    src={selectedSourceCoverUrl}
-                    alt={`${selectedSourceTitle} cover`}
-                    onError={(event) => handleCoverImageError(event, selectedSourceBaseCoverUrl)}
-                  />
-                ) : null}
-              </div>
+              {selectedSource ? (
+                <div className="selected-book-cover">
+                  {selectedSourceCoverUrl ? (
+                    <img
+                      src={selectedSourceCoverUrl}
+                      alt={`${selectedSourceTitle} cover`}
+                      onError={(event) => handleCoverImageError(event, selectedSourceBaseCoverUrl)}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
               <div>
                 <p className="game-eyebrow">Now reading</p>
-                <h3>{selectedSourceTitle}</h3>
+                <h3>{selectedSourceSummary}</h3>
               </div>
             </div>
           ) : null}
@@ -640,10 +704,12 @@ function GamePage() {
             </div>
           ) : null}
 
-          {!isLoadingQuestions && !sectionCards.length ? <p>No active sections found for this book.</p> : null}
+          {!isLoadingQuestions && !sectionCards.length ? (
+            <p>No active sections found for the selected {selectedSourceCount === 1 ? 'book' : 'books'}.</p>
+          ) : null}
 
           <button className="game-secondary-button" type="button" onClick={chooseAnotherBook}>
-            Choose another book
+            Choose different books
           </button>
         </div>
       ) : null}
@@ -669,6 +735,12 @@ function GamePage() {
               </button>
             ))}
           </div>
+
+          {!selectedSectionQuestions.length ? (
+            <p className="game-empty-message">
+              No active questions are available for this section. Go back and choose another topic.
+            </p>
+          ) : null}
 
           <button
             className="game-primary-button"
@@ -707,9 +779,9 @@ function GamePage() {
             <span style={{ width: `${Math.min(100, Math.max(8, ((currentQuestionIndex + 1) / Math.max(1, questionQueue.length)) * 100))}%` }} />
           </div>
 
-          {selectedSource ? (
+          {currentQuestion ? (
             <p className="question-source-context" aria-label="Question source">
-              This question comes from <strong>{selectedSourceTitle}</strong>.
+              This question comes from <strong>{currentQuestionSourceTitle}</strong>.
             </p>
           ) : null}
 
@@ -777,6 +849,20 @@ function GamePage() {
             <div className="result-stars" aria-hidden="true">★★★</div>
             <h3><span>{results.percentCorrect}</span>%</h3>
             <p className="results-scoreline">{results.correctCount} of {results.attemptedCount} correct</p>
+            <dl className="results-list results-meta-list">
+              <div>
+                <dt>Books</dt>
+                <dd>{results.sourceTitle}</dd>
+              </div>
+              <div>
+                <dt>Section</dt>
+                <dd>{results.sectionName}</dd>
+              </div>
+              <div>
+                <dt>Challenge</dt>
+                <dd>{results.challengeName}</dd>
+              </div>
+            </dl>
             <p className="results-summary">{getResultMessage(results.percentCorrect)}</p>
 
             <div className="result-actions">
