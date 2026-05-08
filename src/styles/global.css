@@ -910,12 +910,15 @@ body {
 }
 
 .result-actions {
-  display: grid;
+  display: flex;
+  justify-content: center;
   gap: 0.4rem;
+  width: 100%;
 }
 
 .result-actions .game-primary-button,
 .result-actions .game-secondary-button {
+  min-height: 2.65rem;
   margin-top: 0;
 }
 
@@ -1729,9 +1732,9 @@ body {
   z-index: 1;
   margin: 0.15rem 0 0.45rem;
   color: var(--game-cream);
-  font-size: clamp(1.35rem, 3.2vw, 2rem);
-  line-height: 1.02;
-  letter-spacing: -0.04em;
+  font-size: clamp(1.15rem, 2.45vw, 1.55rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
 }
 
 .book-promo-panel p {
