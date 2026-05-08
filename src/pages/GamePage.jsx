@@ -28,6 +28,13 @@ const MAX_MISTAKES_IN_LIVES_MODE = 2
 const SHOW_CORRECT_ANSWER_DEBUG = true
 const CHOICE_KEYS = ['A', 'B', 'C', 'D']
 const GAME_QUESTIONS_PAGE_SIZE = 1000
+const LENNY_AVATAR_IMAGE_URL = '/images/brand/lenny-lenski-avatar01.png'
+const DEFAULT_BOOK_DETAILS = {
+  title: 'Welcome to Nostalgic Decades Trivia',
+  body:
+    'Pick one book, mix a few decades, or challenge yourself across the whole shelf. Lenny will guide you through the eras — one clever question at a time.'
+}
+const MISSING_BOOK_DESCRIPTION = 'More details coming soon for this volume.'
 const SOURCE_PILL_CLASS_NAMES = {
   'The Booming 50s': 'source-pill-50s',
   'The Swinging 60s': 'source-pill-60s',
@@ -116,6 +123,10 @@ function shuffleItems(items) {
 
 function getSourceTitle(source) {
   return source?.short_title || source?.full_title || 'Untitled book'
+}
+
+function getSourceDescription(source) {
+  return source?.description?.trim() || MISSING_BOOK_DESCRIPTION
 }
 
 function getSourcePillClassName(sourceTitle) {
@@ -328,6 +339,8 @@ function GamePage() {
   const [sourceQuestions, setSourceQuestions] = useState([])
   const [categories, setCategories] = useState([])
   const [selectedSourceIds, setSelectedSourceIds] = useState([])
+  const [hoveredSourceId, setHoveredSourceId] = useState('')
+  const [focusedBookDetailsSourceId, setFocusedBookDetailsSourceId] = useState('')
   const [selectedSectionKeys, setSelectedSectionKeys] = useState([])
   const [selectedModeId, setSelectedModeId] = useState('')
   const [questionQueue, setQuestionQueue] = useState([])
@@ -487,12 +500,13 @@ function GamePage() {
 
   function toggleSelectedSource(sourceId) {
     const sourceIdValue = String(sourceId)
+    const isSelected = selectedSourceIds.includes(sourceIdValue)
+    const nextSourceIds = isSelected
+      ? selectedSourceIds.filter((currentSourceId) => currentSourceId !== sourceIdValue)
+      : [...selectedSourceIds, sourceIdValue]
 
-    setSelectedSourceIds((currentSourceIds) =>
-      currentSourceIds.includes(sourceIdValue)
-        ? currentSourceIds.filter((currentSourceId) => currentSourceId !== sourceIdValue)
-        : [...currentSourceIds, sourceIdValue]
-    )
+    setSelectedSourceIds(nextSourceIds)
+    setFocusedBookDetailsSourceId(isSelected ? nextSourceIds[nextSourceIds.length - 1] || '' : sourceIdValue)
     setSelectedSectionKeys([])
     setSelectedModeId('')
     setQuestionQueue([])
@@ -623,6 +637,8 @@ function GamePage() {
 
   function chooseAnotherBook() {
     setSelectedSourceIds([])
+    setHoveredSourceId('')
+    setFocusedBookDetailsSourceId('')
     setSelectedSectionKeys([])
     setSelectedModeId('')
     setQuestionQueue([])
@@ -641,6 +657,8 @@ function GamePage() {
 
   function resetGameSetup() {
     setSelectedSourceIds([])
+    setHoveredSourceId('')
+    setFocusedBookDetailsSourceId('')
     setSelectedSectionKeys([])
     setSelectedModeId('')
     setQuestionQueue([])
@@ -670,6 +688,14 @@ function GamePage() {
   const currentQuestionSourceTitle = getSourceTitle(sourcesById[String(currentQuestion?.source_id)])
   const selectedSourceBaseCoverUrl = selectedSource ? getBaseCoverImageUrl(selectedSource) : ''
   const selectedSourceCoverUrl = selectedSource ? getCoverImageUrl(selectedSource, 'medium') : ''
+  const detailsSourceId = hoveredSourceId || (selectedSourceIds.includes(focusedBookDetailsSourceId) ? focusedBookDetailsSourceId : '')
+  const detailsSource = detailsSourceId ? sourcesById[detailsSourceId] : null
+  const bookDetailsPane = detailsSource
+    ? {
+        title: detailsSource.short_title || getSourceTitle(detailsSource),
+        body: getSourceDescription(detailsSource)
+      }
+    : DEFAULT_BOOK_DETAILS
   const stepLabels = {
     book: 'Pick your books',
     section: 'Choose your areas of expertise',
@@ -737,6 +763,10 @@ function GamePage() {
                     key={source.id}
                     type="button"
                     onClick={() => toggleSelectedSource(source.id)}
+                    onMouseEnter={() => setHoveredSourceId(String(source.id))}
+                    onMouseLeave={() => setHoveredSourceId('')}
+                    onFocus={() => setHoveredSourceId(String(source.id))}
+                    onBlur={() => setHoveredSourceId('')}
                     aria-pressed={selectedSourceIds.includes(String(source.id))}
                   >
                     <div className="book-cover-frame">
@@ -772,6 +802,17 @@ function GamePage() {
             {selectedSourceCount ? (selectedSourceCount === 1 ? 'Continue with 1 book' : `Continue with ${selectedSourceCount} books`) : 'Pick at least one book to continue'}
           </button>
           {isLoadingQuestions ? <p>Loading sections...</p> : null}
+
+          <aside className="book-details-pane" aria-live="polite">
+            <div className="book-details-copy">
+              <p className="game-eyebrow">Lenny Lenski library</p>
+              <h3>{bookDetailsPane.title}</h3>
+              <p>{bookDetailsPane.body}</p>
+            </div>
+            <div className="book-details-avatar" aria-hidden="true">
+              <img src={LENNY_AVATAR_IMAGE_URL} alt="" />
+            </div>
+          </aside>
         </div>
       ) : null}
 
