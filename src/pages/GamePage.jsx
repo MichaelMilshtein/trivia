@@ -262,7 +262,7 @@ function GamePage() {
         const [sourceRows, categoryRows] = await Promise.all([
           selectFrom('sources', {
             columns:
-              'id,short_title,full_title,front_cover_image_url,back_cover_image_url,description,author,display_order,is_active',
+              'id,short_title,full_title,front_cover_image_url,back_cover_image_url,description,author,store_url,display_order,is_active',
             filters: {
               is_active: 'eq.true'
             }
@@ -771,50 +771,64 @@ function GamePage() {
       ) : null}
 
       {step === 'results' && results ? (
-        <div className="results-screen">
-          <p className="game-eyebrow">Challenge complete</p>
-          <div className="result-stars" aria-hidden="true">★★★</div>
-          <h3><span>{results.percentCorrect}</span>%</h3>
-          <p className="results-scoreline">{results.correctCount} of {results.attemptedCount} correct</p>
-          <p className="results-summary">{getResultMessage(results.percentCorrect)}</p>
-          <dl className="results-list">
-            <div>
-              <dt>Challenge played</dt>
-              <dd>{results.challengeName}</dd>
-            </div>
-            <div>
-              <dt>Book</dt>
-              <dd>{results.sourceTitle}</dd>
-            </div>
-            <div>
-              <dt>Section</dt>
-              <dd>{results.sectionName}</dd>
-            </div>
-            <div>
-              <dt>Correct answers</dt>
-              <dd>{results.correctCount}</dd>
-            </div>
-            <div>
-              <dt>Attempted questions</dt>
-              <dd>{results.attemptedCount}</dd>
-            </div>
-            <div>
-              <dt>Percent correct</dt>
-              <dd>{results.percentCorrect}%</dd>
-            </div>
-          </dl>
+        <div className="results-screen results-split-screen">
+          <div className="results-score-panel">
+            <p className="game-eyebrow">Challenge complete</p>
+            <div className="result-stars" aria-hidden="true">★★★</div>
+            <h3><span>{results.percentCorrect}</span>%</h3>
+            <p className="results-scoreline">{results.correctCount} of {results.attemptedCount} correct</p>
+            <p className="results-summary">{getResultMessage(results.percentCorrect)}</p>
 
-          <div className="result-actions">
-            <button className="game-primary-button" type="button" onClick={playAgain}>
-              Play again
-            </button>
-            <button className="game-secondary-button" type="button" onClick={chooseAnotherSection}>
-              Choose another section
-            </button>
-            <button className="game-secondary-button" type="button" onClick={chooseAnotherBook}>
-              Choose another book
-            </button>
+            <div className="result-actions">
+              <button className="game-primary-button" type="button" onClick={playAgain}>
+                Play again
+              </button>
+            </div>
           </div>
+
+          <aside className="book-promo-panel" aria-labelledby="book-promo-heading">
+            <p className="game-eyebrow">Lenny Lenski library</p>
+            <h3 id="book-promo-heading">Keep playing through the decades</h3>
+            <p>
+              This challenge is based on Lenny Lenski’s Nostalgic Decades puzzle books — packed with trivia,
+              word searches, crosswords, brain teasers, jokes, and more.
+            </p>
+
+            <div className="book-promo-grid" aria-label="Active Lenny Lenski books">
+              {sources.map((source) => {
+                const coverImageUrl = getCoverImageUrl(source, 'small')
+                const bookTitle = getSourceTitle(source)
+                const bookContent = (
+                  <>
+                    <span className="book-promo-cover">
+                      {coverImageUrl ? <img src={coverImageUrl} alt={`${bookTitle} cover`} loading="lazy" /> : <span>No cover</span>}
+                    </span>
+                    <span className="book-promo-title">{bookTitle}</span>
+                  </>
+                )
+
+                return source.store_url ? (
+                  <a
+                    className="book-promo-book"
+                    href={source.store_url}
+                    key={source.id}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {bookContent}
+                  </a>
+                ) : (
+                  <div className="book-promo-book" key={source.id}>
+                    {bookContent}
+                  </div>
+                )
+              })}
+            </div>
+
+            <a className="book-promo-visit" href="https://lennylenski.com" target="_blank" rel="noreferrer">
+              Visit LennyLenski.com
+            </a>
+          </aside>
         </div>
       ) : null}
       </div>
