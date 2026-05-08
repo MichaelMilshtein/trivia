@@ -1522,6 +1522,10 @@ body {
   margin-left: 0.45rem;
 }
 
+.answer-next-button-final-life::after {
+  content: none;
+}
+
 .answer-next-button-correct {
   background: linear-gradient(180deg, #16a34a, #15803d);
   color: #ffffff;
