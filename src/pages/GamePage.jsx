@@ -471,6 +471,19 @@ function GamePage() {
   }, [selectedSectionKeys, sourceQuestions])
 
   const currentQuestion = questionQueue[currentQuestionIndex]
+  const isFinalLifeFailureFeedback =
+    selectedModeId === GAME_MODES.lives.id &&
+    selectedAnswerIndex !== null &&
+    lastAnswerWasCorrect === false &&
+    livesRemaining === 0
+  const answerNextButtonClassName = [
+    'game-primary-button',
+    'answer-next-button',
+    lastAnswerWasCorrect ? 'answer-next-button-correct' : 'answer-next-button-incorrect',
+    isFinalLifeFailureFeedback ? 'answer-next-button-final-life' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   function toggleSelectedSource(sourceId) {
     const sourceIdValue = String(sourceId)
@@ -937,12 +950,14 @@ function GamePage() {
 
           {selectedAnswerIndex !== null ? (
             <button
-              className={`game-primary-button answer-next-button ${lastAnswerWasCorrect ? 'answer-next-button-correct' : 'answer-next-button-incorrect'}`}
+              className={answerNextButtonClassName}
               type="button"
               onClick={moveToNextQuestion}
             >
               <span>{lastAnswerWasCorrect ? 'Correct!' : 'Not quite!'}</span>
-              <span className="answer-next-action">Next question</span>
+              <span className="answer-next-action">
+                {isFinalLifeFailureFeedback ? 'You are out of lives' : 'Next question'}
+              </span>
             </button>
           ) : null}
         </div>
