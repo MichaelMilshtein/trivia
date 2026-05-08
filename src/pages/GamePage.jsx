@@ -27,12 +27,44 @@ const SPRINT_SECONDS = 20
 const MAX_MISTAKES_IN_LIVES_MODE = 2
 const SHOW_CORRECT_ANSWER_DEBUG = true
 const CHOICE_KEYS = ['A', 'B', 'C', 'D']
+const GAME_QUESTIONS_PAGE_SIZE = 1000
 const SOURCE_PILL_CLASS_NAMES = {
   'The Booming 50s': 'source-pill-50s',
   'The Swinging 60s': 'source-pill-60s',
   'The Groovy 70s': 'source-pill-70s',
   'The Neon 80s': 'source-pill-80s',
   'The Mighty 90s': 'source-pill-90s'
+}
+
+async function fetchActiveQuestionsForSources(sourceIds) {
+  if (!sourceIds.length) {
+    return []
+  }
+
+  const activeQuestionRows = []
+  let offset = 0
+  let hasMoreQuestions = true
+
+  while (hasMoreQuestions) {
+    const questionPage = await selectFrom('questions', {
+      columns:
+        'id,source_id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,section,category_id',
+      filters: {
+        is_active: 'eq.true',
+        source_id: `in.(${sourceIds.join(',')})`,
+        question_type: 'eq.mc_single',
+        order: 'id.asc',
+        limit: String(GAME_QUESTIONS_PAGE_SIZE),
+        offset: String(offset)
+      }
+    })
+
+    activeQuestionRows.push(...questionPage)
+    hasMoreQuestions = questionPage.length === GAME_QUESTIONS_PAGE_SIZE
+    offset += GAME_QUESTIONS_PAGE_SIZE
+  }
+
+  return activeQuestionRows
 }
 
 function shuffleItems(items) {
@@ -414,15 +446,8 @@ function GamePage() {
     setIsLoadingQuestions(true)
 
     try {
-      const rows = await selectFrom('questions', {
-        columns:
-          'id,source_id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,section,category_id',
-        filters: {
-          is_active: 'eq.true',
-          source_id: `in.(${selectedSourceIds.join(',')})`,
-          question_type: 'eq.mc_single'
-        }
-      })
+      const activeSelectedSourceIds = selectedSourceIds.filter((sourceId) => sourcesById[sourceId]?.is_active)
+      const rows = await fetchActiveQuestionsForSources(activeSelectedSourceIds)
 
       setSourceQuestions(rows)
       setStep('section')
