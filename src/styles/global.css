@@ -2014,3 +2014,27 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+.admin-matrix-scroll {
+  overflow-x: auto;
+}
+
+.admin-question-matrix-table {
+  min-width: 720px;
+}
+
+.admin-question-matrix-table th:first-child {
+  min-width: 180px;
+}
+
+.admin-question-matrix-table tfoot th,
+.admin-question-matrix-table tfoot td,
+.admin-matrix-total-cell {
+  font-weight: 700;
+  background: #f8fafc;
+}
+
+.admin-matrix-number-cell {
+  text-align: right;
+  white-space: nowrap;
+}

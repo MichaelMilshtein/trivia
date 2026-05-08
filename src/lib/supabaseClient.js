@@ -9,7 +9,7 @@ function getSupabaseConfig() {
   return { supabaseUrl, supabasePublishableKey }
 }
 
-export async function selectFrom(table, { columns = '*', filters = {} } = {}) {
+export async function selectFrom(table, { columns = '*', filters = {}, range = null } = {}) {
   const { supabaseUrl: url, supabasePublishableKey: key } = getSupabaseConfig()
 
   const queryParams = new URLSearchParams({ select: columns })
@@ -18,12 +18,18 @@ export async function selectFrom(table, { columns = '*', filters = {} } = {}) {
     queryParams.set(field, value)
   }
 
+  const headers = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    'Content-Type': 'application/json'
+  }
+
+  if (range) {
+    headers.Range = `${range.from}-${range.to}`
+  }
+
   const response = await fetch(`${url}/rest/v1/${table}?${queryParams.toString()}`, {
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json'
-    }
+    headers
   })
 
   if (!response.ok) {
