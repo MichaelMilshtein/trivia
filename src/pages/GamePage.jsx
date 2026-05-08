@@ -328,7 +328,7 @@ function GamePage() {
   const [sourceQuestions, setSourceQuestions] = useState([])
   const [categories, setCategories] = useState([])
   const [selectedSourceIds, setSelectedSourceIds] = useState([])
-  const [selectedSectionKey, setSelectedSectionKey] = useState('')
+  const [selectedSectionKeys, setSelectedSectionKeys] = useState([])
   const [selectedModeId, setSelectedModeId] = useState('')
   const [questionQueue, setQuestionQueue] = useState([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -435,27 +435,40 @@ function GamePage() {
   )
 
   const sectionCards = useMemo(() => {
-    const sectionCountsByKey = sourceQuestions.reduce((accumulator, question) => {
+    const questionIdsBySectionKey = sourceQuestions.reduce((accumulator, question) => {
       const publicSectionKey = getPublicSectionKey(question)
 
       if (!publicSectionKey) {
         return accumulator
       }
 
-      accumulator.set(publicSectionKey, (accumulator.get(publicSectionKey) || 0) + 1)
+      const questionIds = accumulator.get(publicSectionKey) || new Set()
+      questionIds.add(String(question.id))
+      accumulator.set(publicSectionKey, questionIds)
       return accumulator
     }, new Map())
 
     return PUBLIC_SECTION_ORDER.map((sectionKey) => ({
       key: sectionKey,
-      questionCount: sectionCountsByKey.get(sectionKey) || 0
+      questionCount: questionIdsBySectionKey.get(sectionKey)?.size || 0
     })).filter((section) => section.questionCount > 0)
   }, [sourceQuestions])
 
-  const selectedSectionQuestions = useMemo(
-    () => sourceQuestions.filter((question) => getPublicSectionKey(question) === selectedSectionKey),
-    [selectedSectionKey, sourceQuestions]
-  )
+  const selectedSectionQuestions = useMemo(() => {
+    const selectedQuestionIds = new Set()
+
+    return sourceQuestions.filter((question) => {
+      const publicSectionKey = getPublicSectionKey(question)
+      const questionId = String(question.id)
+
+      if (!publicSectionKey || !selectedSectionKeys.includes(publicSectionKey) || selectedQuestionIds.has(questionId)) {
+        return false
+      }
+
+      selectedQuestionIds.add(questionId)
+      return true
+    })
+  }, [selectedSectionKeys, sourceQuestions])
 
   const currentQuestion = questionQueue[currentQuestionIndex]
 
@@ -467,7 +480,7 @@ function GamePage() {
         ? currentSourceIds.filter((currentSourceId) => currentSourceId !== sourceIdValue)
         : [...currentSourceIds, sourceIdValue]
     )
-    setSelectedSectionKey('')
+    setSelectedSectionKeys([])
     setSelectedModeId('')
     setQuestionQueue([])
     setSourceQuestions([])
@@ -480,7 +493,7 @@ function GamePage() {
       return
     }
 
-    setSelectedSectionKey('')
+    setSelectedSectionKeys([])
     setSelectedModeId('')
     setQuestionQueue([])
     setResults(null)
@@ -501,9 +514,24 @@ function GamePage() {
     }
   }
 
-  function handleChooseSection(sectionKey) {
-    setSelectedSectionKey(sectionKey)
+  function toggleSelectedSection(sectionKey) {
+    setSelectedSectionKeys((currentSectionKeys) =>
+      currentSectionKeys.includes(sectionKey)
+        ? currentSectionKeys.filter((currentSectionKey) => currentSectionKey !== sectionKey)
+        : [...currentSectionKeys, sectionKey]
+    )
     setSelectedModeId('')
+    setQuestionQueue([])
+    setResults(null)
+  }
+
+  function continueWithSelectedSections() {
+    if (!selectedSectionKeys.length) {
+      return
+    }
+
+    setSelectedModeId('')
+    setQuestionQueue([])
     setResults(null)
     setStep('mode')
   }
@@ -514,7 +542,7 @@ function GamePage() {
   }
 
   function startGame() {
-    if (!selectedSourceIds.length || !selectedSectionKey || !selectedModeId || !selectedSectionQuestions.length) {
+    if (!selectedSourceIds.length || !selectedSectionKeys.length || !selectedModeId || !selectedSectionQuestions.length) {
       return
     }
 
@@ -582,7 +610,7 @@ function GamePage() {
 
   function chooseAnotherBook() {
     setSelectedSourceIds([])
-    setSelectedSectionKey('')
+    setSelectedSectionKeys([])
     setSelectedModeId('')
     setQuestionQueue([])
     setSourceQuestions([])
@@ -591,7 +619,7 @@ function GamePage() {
   }
 
   function chooseAnotherSection() {
-    setSelectedSectionKey('')
+    setSelectedSectionKeys([])
     setSelectedModeId('')
     setQuestionQueue([])
     setResults(null)
@@ -600,7 +628,7 @@ function GamePage() {
 
   function resetGameSetup() {
     setSelectedSourceIds([])
-    setSelectedSectionKey('')
+    setSelectedSectionKeys([])
     setSelectedModeId('')
     setQuestionQueue([])
     setSourceQuestions([])
@@ -621,6 +649,7 @@ function GamePage() {
     resetGameSetup()
   }
 
+  const selectedSectionCount = selectedSectionKeys.length
   const selectedSourceTitle = selectedSource ? getSourceTitle(selectedSource) : ''
   const selectedSourceCount = selectedSourceIds.length
   const selectedSourceSummary =
@@ -630,7 +659,7 @@ function GamePage() {
   const selectedSourceCoverUrl = selectedSource ? getCoverImageUrl(selectedSource, 'medium') : ''
   const stepLabels = {
     book: 'Pick books',
-    section: 'Pick a section',
+    section: 'Pick sections',
     mode: 'Pick a challenge',
     play: selectedMode?.shortName || 'Challenge',
     results: 'Game over'
@@ -758,7 +787,8 @@ function GamePage() {
           ) : null}
 
           <div className="game-panel-heading">
-            <p className="game-eyebrow">Step 2 · Pick any topic</p>
+            <p className="game-eyebrow">Step 2 · Pick any topics</p>
+            <p>Select one or more public sections, then choose your challenge.</p>
           </div>
 
           {isLoadingQuestions ? <p>Loading sections...</p> : null}
@@ -767,10 +797,11 @@ function GamePage() {
             <div className="section-card-grid">
               {sectionCards.map((section, index) => (
                 <button
-                  className="section-card"
+                  className={selectedSectionKeys.includes(section.key) ? 'section-card section-card-selected' : 'section-card'}
                   key={section.key}
                   type="button"
-                  onClick={() => handleChooseSection(section.key)}
+                  onClick={() => toggleSelectedSection(section.key)}
+                  aria-pressed={selectedSectionKeys.includes(section.key)}
                 >
                   <span className="section-card-mark" aria-hidden="true">
                     <SectionIcon type={getSectionIconType(section.key, index)} />
@@ -786,6 +817,14 @@ function GamePage() {
             <p>No active sections found for the selected {selectedSourceCount === 1 ? 'book' : 'books'}.</p>
           ) : null}
 
+          <button
+            className="game-primary-button"
+            type="button"
+            onClick={continueWithSelectedSections}
+            disabled={!selectedSectionCount}
+          >
+            {selectedSectionCount ? (selectedSectionCount === 1 ? 'Continue with 1 section' : `Continue with ${selectedSectionCount} sections`) : 'Select at least 1 section'}
+          </button>
           <button className="game-secondary-button" type="button" onClick={chooseAnotherBook}>
             Choose different books
           </button>
@@ -816,7 +855,7 @@ function GamePage() {
 
           {!selectedSectionQuestions.length ? (
             <p className="game-empty-message">
-              No active questions are available for this section. Go back and choose another topic.
+              No active questions are available for these sections. Go back and choose another topic.
             </p>
           ) : null}
 
@@ -829,7 +868,7 @@ function GamePage() {
             Start playing
           </button>
           <button className="game-secondary-button" type="button" onClick={chooseAnotherSection}>
-            Choose another section
+            Choose other sections
           </button>
         </div>
       ) : null}
