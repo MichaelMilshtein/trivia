@@ -5,6 +5,45 @@ const QUESTION_COLUMNS =
   'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,is_active,source_id,category_id,section'
 const QUESTION_PREVIEW_LENGTH = 80
 const SOURCE_DESCRIPTION_PREVIEW_LENGTH = 120
+const QUESTION_MATRIX_SECTION_ORDER = [
+  'World Events',
+  'Culture',
+  'Culture & Lifestyle',
+  'Entertainment',
+  'Entertainment & Media',
+  'Food',
+  'Technology',
+  'Technology & Innovation',
+  'Globalization & Economy',
+  'Decade Potpourri',
+  'Bonus Pages'
+]
+const UNSECTIONED_QUESTION_LABEL = 'Unsectioned'
+
+function getSourceSortTitle(source) {
+  return (source.short_title || source.full_title || '').toLowerCase()
+}
+
+function compareSourcesByDisplayOrderThenTitle(sourceA, sourceB) {
+  const hasDisplayOrderA = sourceA.display_order !== null && sourceA.display_order !== undefined
+  const hasDisplayOrderB = sourceB.display_order !== null && sourceB.display_order !== undefined
+
+  if (hasDisplayOrderA && hasDisplayOrderB) {
+    const displayOrderA = Number(sourceA.display_order)
+    const displayOrderB = Number(sourceB.display_order)
+
+    if (displayOrderA !== displayOrderB) {
+      return displayOrderA - displayOrderB
+    }
+  }
+
+  if (hasDisplayOrderA !== hasDisplayOrderB) {
+    return hasDisplayOrderA ? -1 : 1
+  }
+
+  return getSourceSortTitle(sourceA).localeCompare(getSourceSortTitle(sourceB))
+}
+
 const QUESTION_SORT_FIELDS = {
   source: 'source',
   section: 'section',
@@ -97,6 +136,9 @@ function AdminPage() {
   const [searchResults, setSearchResults] = useState([])
   const [isSearchingQuestions, setIsSearchingQuestions] = useState(false)
   const [searchQuestionsError, setSearchQuestionsError] = useState('')
+  const [questionMatrixQuestions, setQuestionMatrixQuestions] = useState([])
+  const [isLoadingQuestionMatrix, setIsLoadingQuestionMatrix] = useState(false)
+  const [questionMatrixError, setQuestionMatrixError] = useState('')
 
   const sourceShortTitlesById = useMemo(
     () =>
@@ -127,6 +169,91 @@ function AdminPage() {
       }, {}),
     [sources]
   )
+
+  const questionMatrix = useMemo(() => {
+    const activeSources = sources.filter((source) => source.is_active)
+    const activeSourceIds = new Set(activeSources.map((source) => String(source.id)))
+    const sectionNamesByKey = new Map()
+    const countsBySourceAndSection = new Map()
+    const rowTotalsBySection = new Map()
+    const columnTotalsBySource = activeSources.reduce((accumulator, source) => {
+      accumulator[String(source.id)] = 0
+      return accumulator
+    }, {})
+
+    questionMatrixQuestions.forEach((question) => {
+      const sourceId = String(question.source_id || '')
+
+      if (!activeSourceIds.has(sourceId) || !question.is_active) {
+        return
+      }
+
+      const sectionName = (question.section || '').trim() || UNSECTIONED_QUESTION_LABEL
+      const sectionKey = sectionName.toLowerCase()
+      const sourceSectionKey = `${sourceId}::${sectionKey}`
+
+      if (!sectionNamesByKey.has(sectionKey)) {
+        sectionNamesByKey.set(sectionKey, sectionName)
+      }
+
+      countsBySourceAndSection.set(
+        sourceSectionKey,
+        (countsBySourceAndSection.get(sourceSectionKey) || 0) + 1
+      )
+      rowTotalsBySection.set(sectionKey, (rowTotalsBySection.get(sectionKey) || 0) + 1)
+      columnTotalsBySource[sourceId] = (columnTotalsBySource[sourceId] || 0) + 1
+    })
+
+    const orderedSectionKeys = [...sectionNamesByKey.keys()].sort((sectionKeyA, sectionKeyB) => {
+      const sectionNameA = sectionNamesByKey.get(sectionKeyA)
+      const sectionNameB = sectionNamesByKey.get(sectionKeyB)
+      const preferredIndexA = QUESTION_MATRIX_SECTION_ORDER.indexOf(sectionNameA)
+      const preferredIndexB = QUESTION_MATRIX_SECTION_ORDER.indexOf(sectionNameB)
+      const hasPreferredOrderA = preferredIndexA !== -1
+      const hasPreferredOrderB = preferredIndexB !== -1
+
+      if (hasPreferredOrderA && hasPreferredOrderB) {
+        return preferredIndexA - preferredIndexB
+      }
+
+      if (hasPreferredOrderA) {
+        return -1
+      }
+
+      if (hasPreferredOrderB) {
+        return 1
+      }
+
+      if (sectionNameA === UNSECTIONED_QUESTION_LABEL && sectionNameB !== UNSECTIONED_QUESTION_LABEL) {
+        return 1
+      }
+
+      if (sectionNameB === UNSECTIONED_QUESTION_LABEL && sectionNameA !== UNSECTIONED_QUESTION_LABEL) {
+        return -1
+      }
+
+      return sectionNameA.localeCompare(sectionNameB)
+    })
+
+    const rows = orderedSectionKeys.map((sectionKey) => ({
+      key: sectionKey,
+      label: sectionNamesByKey.get(sectionKey),
+      total: rowTotalsBySection.get(sectionKey) || 0
+    }))
+
+    const grandTotal = Object.values(columnTotalsBySource).reduce(
+      (total, sourceTotal) => total + sourceTotal,
+      0
+    )
+
+    return {
+      activeSources,
+      rows,
+      countsBySourceAndSection,
+      columnTotalsBySource,
+      grandTotal
+    }
+  }, [questionMatrixQuestions, sources])
 
   const categoriesByNormalizedName = useMemo(
     () =>
@@ -300,18 +427,30 @@ function AdminPage() {
         'id,short_title,full_title,front_cover_image_url,back_cover_image_url,description,store_url,author,display_order,is_active'
     })
 
-    const sortedRows = [...rows].sort((sourceA, sourceB) => {
-      const displayOrderA = Number(sourceA.display_order ?? 0)
-      const displayOrderB = Number(sourceB.display_order ?? 0)
-
-      if (displayOrderA !== displayOrderB) {
-        return displayOrderA - displayOrderB
-      }
-
-      return (sourceA.short_title || '').localeCompare(sourceB.short_title || '')
-    })
+    const sortedRows = [...rows].sort(compareSourcesByDisplayOrderThenTitle)
 
     setSources(sortedRows)
+  }
+
+  async function loadQuestionMatrixQuestions() {
+    setIsLoadingQuestionMatrix(true)
+    setQuestionMatrixError('')
+
+    try {
+      const rows = await selectFrom('questions', {
+        columns: 'id,is_active,source_id,section',
+        filters: {
+          is_active: 'eq.true'
+        }
+      })
+      setQuestionMatrixQuestions(rows)
+    } catch (err) {
+      setQuestionMatrixError(
+        err instanceof Error ? err.message : 'Failed to load question matrix.'
+      )
+    } finally {
+      setIsLoadingQuestionMatrix(false)
+    }
   }
 
   async function fetchCategoryQuestions(sourceId, categoryId = '') {
@@ -439,7 +578,7 @@ function AdminPage() {
   useEffect(() => {
     async function initializeCategories() {
       try {
-        await Promise.all([loadCategories(), loadSources()])
+        await Promise.all([loadCategories(), loadSources(), loadQuestionMatrixQuestions()])
       } catch (err) {
         setError(
           err instanceof Error
@@ -653,6 +792,7 @@ function AdminPage() {
       setBatchSection('')
 
       await refreshCategoryQuestions()
+      await loadQuestionMatrixQuestions()
     } catch (err) {
       if (err instanceof SyntaxError) {
         setImportError('Invalid JSON. Please paste valid JSON and try again.')
@@ -721,6 +861,7 @@ function AdminPage() {
         setSearchResults(rows)
       }
       await refreshCategoryQuestions()
+      await loadQuestionMatrixQuestions()
     } catch (err) {
       setQuestionUpdateError(err instanceof Error ? err.message : 'Failed to update question.')
     } finally {
@@ -833,6 +974,7 @@ function AdminPage() {
         question.is_active ? 'Question deactivated successfully.' : 'Question reactivated successfully.'
       )
       await refreshCategoryQuestions()
+      await loadQuestionMatrixQuestions()
     } catch (err) {
       setQuestionActiveError(
         err instanceof Error ? err.message : 'Failed to update question active status.'
@@ -940,6 +1082,71 @@ function AdminPage() {
         {importError ? <p>{importError}</p> : null}
       </details>
 
+
+      <details className="admin-section" open>
+        <summary className="admin-section-summary">Question Matrix — Active Questions</summary>
+        <p className="admin-row-count">
+          Counts include active questions only for active book sources. Columns follow source display order, then title.
+        </p>
+        {isLoadingQuestionMatrix ? <p>Loading question matrix...</p> : null}
+        {questionMatrixError ? <p>{questionMatrixError}</p> : null}
+        {!isLoadingQuestionMatrix && !questionMatrixError ? (
+          questionMatrix.activeSources.length > 0 ? (
+            questionMatrix.rows.length > 0 ? (
+              <div className="admin-matrix-scroll">
+                <table className="admin-simple-table admin-question-matrix-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Section</th>
+                      {questionMatrix.activeSources.map((source) => (
+                        <th key={source.id} scope="col">
+                          {source.short_title || source.full_title || 'Untitled source'}
+                        </th>
+                      ))}
+                      <th scope="col">Row total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {questionMatrix.rows.map((sectionRow) => (
+                      <tr key={sectionRow.key}>
+                        <th scope="row">{sectionRow.label}</th>
+                        {questionMatrix.activeSources.map((source) => {
+                          const matrixCellKey = `${source.id}::${sectionRow.key}`
+                          return (
+                            <td key={source.id} className="admin-matrix-number-cell">
+                              {questionMatrix.countsBySourceAndSection.get(matrixCellKey) || 0}
+                            </td>
+                          )
+                        })}
+                        <td className="admin-matrix-number-cell admin-matrix-total-cell">
+                          {sectionRow.total}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th scope="row">Column total</th>
+                      {questionMatrix.activeSources.map((source) => (
+                        <td key={source.id} className="admin-matrix-number-cell admin-matrix-total-cell">
+                          {questionMatrix.columnTotalsBySource[String(source.id)] || 0}
+                        </td>
+                      ))}
+                      <td className="admin-matrix-number-cell admin-matrix-total-cell">
+                        {questionMatrix.grandTotal}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <p>No active questions found for active sources.</p>
+            )
+          ) : (
+            <p>No active book sources found.</p>
+          )
+        ) : null}
+      </details>
       <details className="admin-section" open>
         <summary className="admin-section-summary">Questions List</summary>
         {listSourceIdFilter && filteredCategoryQuestions.length > 0 ? (
