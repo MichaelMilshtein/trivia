@@ -125,7 +125,6 @@ function AdminPage() {
   const [isUpdatingSource, setIsUpdatingSource] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [selectedSourceId, setSelectedSourceId] = useState('')
-  const [batchSection, setBatchSection] = useState('')
   const [questionsJson, setQuestionsJson] = useState('')
   const [importMessage, setImportMessage] = useState('')
   const [importError, setImportError] = useState('')
@@ -739,9 +738,6 @@ function AdminPage() {
       const sourceQuestions = parsed?.questions
       const jsonSourceTitle =
         typeof parsed?.source_title === 'string' ? parsed.source_title.trim() : ''
-      const jsonBatchSection =
-        typeof parsed?.section === 'string' ? parsed.section.trim() : ''
-      const fallbackBatchSection = batchSection.trim()
       const fallbackSourceId = selectedSourceId || null
       const fallbackCategoryId = selectedCategoryId || null
 
@@ -768,7 +764,7 @@ function AdminPage() {
         const correctIndex = question.correct_index
         const questionSection =
           typeof question.section === 'string' ? question.section.trim() : ''
-        const resolvedSection = questionSection || jsonBatchSection || fallbackBatchSection
+        const resolvedSection = questionSection
         const questionCategoryName =
           typeof question.category === 'string' ? question.category.trim() : ''
 
@@ -836,7 +832,6 @@ function AdminPage() {
 
       setImportMessage(`Imported ${questionRows.length} question(s) successfully.`)
       setQuestionsJson('')
-      setBatchSection('')
 
       await refreshCategoryQuestions()
       await loadQuestionMatrixQuestions()
@@ -1078,19 +1073,30 @@ function AdminPage() {
         <details id="admin-question-import" className="admin-section" open>
         <summary className="admin-section-summary">Question Import</summary>
         <details className="admin-helper-note">
-          <summary>JSON v1 helper note</summary>
-          <p>Use this format for import payloads (supports optional source_title, section, and category):</p>
+          <summary>JSON import rules</summary>
+          <p>Use this format when importing question batches.</p>
+          <p>Important rules:</p>
+          <ul>
+            <li>Use a top-level object with a "questions" array.</li>
+            <li>Each question must be standalone and read like normal trivia.</li>
+            <li>Do not use wording like “from the puzzle,” “matches this clue,” “answer list,” or “complete the blank.”</li>
+            <li>Correct answer must always be the first item in "choices".</li>
+            <li>Set "correct_index" to 0.</li>
+            <li>Use "question_type": "mc_single".</li>
+            <li>Each question must include "section", "category", "difficulty", and "is_active".</li>
+            <li>Use only approved categories from the category list.</li>
+            <li>Section should match the raw book section, not the public mapped section.</li>
+            <li>For book bonus content, use "Bonus Pages" as the section.</li>
+          </ul>
           <pre>{`{
-  "source_title": "Weekly Trivia",
-  "section": "Round 1",
   "questions": [
     {
       "question_text": "...",
       "category": "History",
-      "choices": ["A", "B", "C", "D"],
+      "choices": ["Correct answer", "Wrong answer", "Wrong answer", "Wrong answer"],
       "correct_index": 0,
       "question_type": "mc_single",
-      "section": "Round 1",
+      "section": "World Events",
       "difficulty": "medium",
       "is_active": true
     }
@@ -1098,7 +1104,7 @@ function AdminPage() {
 }`}</pre>
         </details>
         <form onSubmit={handleImportQuestions}>
-          <label htmlFor="question-category">Category</label>
+          <label htmlFor="question-category">Category fallback</label>
           <select
             id="question-category"
             name="category_id"
@@ -1113,7 +1119,7 @@ function AdminPage() {
             ))}
           </select>
 
-          <label htmlFor="question-source">Source fallback (optional)</label>
+          <label htmlFor="question-source">Import into book/source</label>
           <select
             id="question-source"
             name="source_id"
@@ -1128,15 +1134,6 @@ function AdminPage() {
             ))}
           </select>
 
-          <label htmlFor="question-batch-section">Batch section (optional)</label>
-          <input
-            id="question-batch-section"
-            name="batch_section"
-            type="text"
-            value={batchSection}
-            onChange={(event) => setBatchSection(event.target.value)}
-            placeholder="Used when a question does not include section"
-          />
 
           <label htmlFor="questions-json">Questions JSON</label>
           <textarea
@@ -1149,10 +1146,11 @@ function AdminPage() {
   "questions": [
     {
       "question_text": "...",
-      "choices": ["A", "B", "C", "D"],
+      "category": "History",
+      "choices": ["Correct answer", "Wrong answer", "Wrong answer", "Wrong answer"],
       "correct_index": 0,
       "question_type": "mc_single",
-      "section": "Round 1",
+      "section": "World Events",
       "difficulty": "medium",
       "is_active": true
     }
