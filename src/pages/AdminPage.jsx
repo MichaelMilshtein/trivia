@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { insertInto, selectFrom, updateRows } from '../lib/supabaseClient'
+import {
+  getCurrentAuthSession,
+  insertInto,
+  selectFrom,
+  signInWithPassword,
+  signOut,
+  updateRows
+} from '../lib/supabaseClient'
+
+const ALLOWED_ADMIN_EMAILS = ['admin@example.com']
 
 const QUESTION_COLUMNS =
   'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,is_active,source_id,category_id,section'
@@ -79,9 +88,16 @@ const ADMIN_NAV_ITEMS = [
 ]
 
 function AdminPage() {
+  const [authSession, setAuthSession] = useState(null)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [isSigningIn, setIsSigningIn] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const [categories, setCategories] = useState([])
   const [sources, setSources] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -168,6 +184,13 @@ function AdminPage() {
   const [questionMatrixError, setQuestionMatrixError] = useState('')
   const [openAdminSectionId, setOpenAdminSectionId] = useState('admin-overview')
   const [isAdminSidebarCollapsed, setIsAdminSidebarCollapsed] = useState(false)
+
+  const signedInEmail = (authSession?.user?.email || '').trim().toLowerCase()
+  const allowedAdminEmails = useMemo(
+    () => ALLOWED_ADMIN_EMAILS.map((email) => email.trim().toLowerCase()),
+    []
+  )
+  const isAdminAuthorized = Boolean(signedInEmail && allowedAdminEmails.includes(signedInEmail))
 
   const sourceShortTitlesById = useMemo(
     () =>
@@ -482,6 +505,40 @@ function AdminPage() {
     )
   }
 
+  async function handleLoginSubmit(event) {
+    event.preventDefault()
+    setLoginError('')
+    setIsSigningIn(true)
+
+    try {
+      const session = await signInWithPassword(loginEmail.trim(), loginPassword)
+      setAuthSession(session)
+      setLoginPassword('')
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Unable to sign in.')
+    } finally {
+      setIsSigningIn(false)
+    }
+  }
+
+  async function handleSignOut() {
+    setIsSigningOut(true)
+    setLoginError('')
+
+    try {
+      await signOut()
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Unable to sign out cleanly.')
+    } finally {
+      setAuthSession(null)
+      setCategories([])
+      setSources([])
+      setCategoryQuestions([])
+      setQuestionMatrixQuestions([])
+      setIsSigningOut(false)
+    }
+  }
+
   async function loadCategories() {
     setError('')
 
@@ -709,6 +766,41 @@ function AdminPage() {
   }
 
   useEffect(() => {
+    let isMounted = true
+
+    async function initializeAuthSession() {
+      try {
+        const session = await getCurrentAuthSession()
+
+        if (isMounted) {
+          setAuthSession(session)
+        }
+      } catch (err) {
+        if (isMounted) {
+          setLoginError(err instanceof Error ? err.message : 'Unable to check Admin session.')
+        }
+      } finally {
+        if (isMounted) {
+          setIsCheckingAuth(false)
+        }
+      }
+    }
+
+    initializeAuthSession()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isAdminAuthorized) {
+      setIsLoading(false)
+      return undefined
+    }
+
+    setIsLoading(true)
+
     async function initializeCategories() {
       try {
         await Promise.all([loadCategories(), loadSources(), loadQuestionMatrixQuestions()])
@@ -724,9 +816,15 @@ function AdminPage() {
     }
 
     initializeCategories()
-  }, [])
+    return undefined
+  }, [isAdminAuthorized])
 
   useEffect(() => {
+    if (!isAdminAuthorized) {
+      setIsLoadingQuestions(false)
+      return undefined
+    }
+
     async function loadQuestionsForCategory() {
       setIsLoadingQuestions(true)
       setQuestionsError('')
@@ -742,7 +840,8 @@ function AdminPage() {
     }
 
     loadQuestionsForCategory()
-  }, [])
+    return undefined
+  }, [isAdminAuthorized])
 
   useEffect(() => {
     if (!categoryDrawerMode && !sourceDrawerMode && !questionDrawerMode) {
@@ -1208,6 +1307,75 @@ function AdminPage() {
     })
   }
 
+  if (isCheckingAuth) {
+    return (
+      <section className="admin-auth-page" aria-live="polite">
+        <div className="admin-auth-card">
+          <p className="admin-kicker">Admin access</p>
+          <h2>Checking your Admin session…</h2>
+        </div>
+      </section>
+    )
+  }
+
+  if (!authSession) {
+    return (
+      <section className="admin-auth-page">
+        <div className="admin-auth-card">
+          <p className="admin-kicker">Admin access</p>
+          <h2>Sign in to continue</h2>
+          <p className="admin-auth-copy">Use your Supabase email and password to open Admin tools.</p>
+          <form className="admin-auth-form" onSubmit={handleLoginSubmit}>
+            <label htmlFor="admin-login-email">Email</label>
+            <input
+              id="admin-login-email"
+              type="email"
+              autoComplete="email"
+              value={loginEmail}
+              onChange={(event) => setLoginEmail(event.target.value)}
+              required
+            />
+            <label htmlFor="admin-login-password">Password</label>
+            <input
+              id="admin-login-password"
+              type="password"
+              autoComplete="current-password"
+              value={loginPassword}
+              onChange={(event) => setLoginPassword(event.target.value)}
+              required
+            />
+            <button type="submit" disabled={isSigningIn}>
+              {isSigningIn ? 'Signing in…' : 'Sign in'}
+            </button>
+            <div className="admin-auth-message" role="alert" aria-live="polite">
+              {loginError}
+            </div>
+          </form>
+        </div>
+      </section>
+    )
+  }
+
+  if (!isAdminAuthorized) {
+    return (
+      <section className="admin-auth-page">
+        <div className="admin-auth-card">
+          <p className="admin-kicker">Admin access</p>
+          <h2>This account is not authorized for Admin access</h2>
+          <p className="admin-auth-copy">
+            Signed in as <strong>{authSession.user?.email || 'unknown email'}</strong>.
+          </p>
+          <button type="button" onClick={handleSignOut} disabled={isSigningOut}>
+            {isSigningOut ? 'Signing out…' : 'Sign out'}
+          </button>
+          <div className="admin-auth-message" role="alert" aria-live="polite">
+            {loginError}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className={`admin-page${isAdminSidebarCollapsed ? ' admin-page-sidebar-collapsed' : ''}`}>
       <aside
@@ -1248,6 +1416,12 @@ function AdminPage() {
               ))}
             </ul>
           </nav>
+          <div className="admin-sidebar-auth">
+            <span className="admin-sidebar-auth-email">{authSession.user?.email}</span>
+            <button type="button" onClick={handleSignOut} disabled={isSigningOut}>
+              {isSigningOut ? 'Signing out…' : 'Sign out'}
+            </button>
+          </div>
         </div>
       </aside>
       <div className="admin-content">
