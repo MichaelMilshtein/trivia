@@ -1632,8 +1632,7 @@ function AdminPage() {
         </div>
 
         {!isLoadingQuestions && !questionsError ? (
-          filteredCategoryQuestions.length > 0 ? (
-            <table className="admin-question-table">
+          <table className="admin-question-table">
               <thead>
                 <tr>
                   <th scope="col">Question</th>
@@ -1786,6 +1785,13 @@ function AdminPage() {
                 </tr>
               </thead>
               <tbody>
+                {filteredCategoryQuestions.length === 0 ? (
+                  <tr>
+                    <td className="admin-question-empty-cell" colSpan="8">
+                      No questions match the current filters.
+                    </td>
+                  </tr>
+                ) : null}
                 {filteredCategoryQuestions.map((question) => (
                   <tr key={question.id}>
                     <td title={question.question_text || ''} className="admin-question-cell-preview">
@@ -1815,9 +1821,6 @@ function AdminPage() {
                 ))}
               </tbody>
             </table>
-          ) : (
-            <p>No questions found for the current filters.</p>
-          )
         ) : null}
       </details>
 
