@@ -1,3 +1,1 @@
-export const navItems = [
-  { path: '/game', label: 'Game' },
-]
+export const navItems = []

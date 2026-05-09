@@ -347,3 +347,28 @@ export async function updateRows(table, values, filters = {}) {
 
   return rows
 }
+
+export async function upsertInto(table, values, { onConflict = 'id' } = {}) {
+  const { supabaseUrl: url } = getSupabaseConfig()
+  const queryParams = new URLSearchParams({ on_conflict: onConflict })
+
+  const response = await fetch(`${url}/rest/v1/${table}?${queryParams.toString()}`, {
+    method: 'POST',
+    headers: await getSupabaseRestHeaders({
+      Prefer: 'resolution=merge-duplicates,return=representation'
+    }),
+    body: JSON.stringify(values)
+  })
+
+  if (!response.ok) {
+    await throwSupabaseRestError(response, 'Unable to upsert Supabase rows.')
+  }
+
+  const rows = await response.json()
+
+  if (Array.isArray(rows) && rows.length === 0) {
+    throw new Error('Supabase request did not save any rows. Check your Admin sign-in and RLS policies.')
+  }
+
+  return rows
+}

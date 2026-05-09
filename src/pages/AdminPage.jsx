@@ -4,8 +4,17 @@ import {
   selectFrom,
   signOut,
   supabase,
-  updateRows
+  updateRows,
+  upsertInto
 } from '../lib/supabaseClient'
+
+const DEFAULT_GAME_SETTINGS_ROW = {
+  id: 'default',
+  debug_enabled: false,
+  sprint_seconds: 60,
+  show_correct_answers: false
+}
+const SPRINT_DURATION_OPTIONS = [10, 20, 30, 60]
 
 const ALLOWED_ADMIN_EMAILS = ['admin@example.com', 'michael.milshtein@gmail.com']
 
@@ -89,6 +98,7 @@ function formatAdminError(actionLabel, err, fallbackMessage) {
 
 const ADMIN_NAV_ITEMS = [
   { id: 'admin-overview', href: '#admin-overview', label: 'Dashboard / Overview', icon: '▦' },
+  { id: 'admin-game-settings', href: '#admin-game-settings', label: 'Game Settings', icon: '⚙' },
   { id: 'admin-sources', href: '#admin-sources', label: 'Book Sources', icon: '▤' },
   { id: 'admin-categories', href: '#admin-categories', label: 'Categories', icon: '◇' },
   { id: 'admin-question-import', href: '#admin-question-import', label: 'Question Import', icon: '↥' },
@@ -191,6 +201,13 @@ function AdminPage() {
   const [questionMatrixQuestions, setQuestionMatrixQuestions] = useState([])
   const [isLoadingQuestionMatrix, setIsLoadingQuestionMatrix] = useState(false)
   const [questionMatrixError, setQuestionMatrixError] = useState('')
+  const [gameSettingsDebugEnabled, setGameSettingsDebugEnabled] = useState(false)
+  const [gameSettingsSprintSeconds, setGameSettingsSprintSeconds] = useState('60')
+  const [gameSettingsShowCorrectAnswers, setGameSettingsShowCorrectAnswers] = useState(false)
+  const [gameSettingsMessage, setGameSettingsMessage] = useState('')
+  const [gameSettingsError, setGameSettingsError] = useState('')
+  const [isLoadingGameSettings, setIsLoadingGameSettings] = useState(false)
+  const [isSavingGameSettings, setIsSavingGameSettings] = useState(false)
   const [openAdminSectionId, setOpenAdminSectionId] = useState('admin-overview')
   const [isAdminSidebarCollapsed, setIsAdminSidebarCollapsed] = useState(false)
 
@@ -595,6 +612,69 @@ function AdminPage() {
     }
   }
 
+  function applyGameSettingsRow(settingsRow) {
+    const resolvedSettingsRow = settingsRow || DEFAULT_GAME_SETTINGS_ROW
+
+    setGameSettingsDebugEnabled(Boolean(resolvedSettingsRow.debug_enabled))
+    setGameSettingsSprintSeconds(String(resolvedSettingsRow.sprint_seconds ?? 60))
+    setGameSettingsShowCorrectAnswers(Boolean(resolvedSettingsRow.show_correct_answers))
+  }
+
+  async function loadGameSettings() {
+    setIsLoadingGameSettings(true)
+    setGameSettingsError('')
+
+    try {
+      const rows = await selectFrom('game_settings', {
+        columns: 'id,debug_enabled,sprint_seconds,show_correct_answers,updated_at',
+        filters: {
+          id: 'eq.default',
+          limit: '1'
+        }
+      })
+
+      applyGameSettingsRow(rows[0])
+      return rows[0] || DEFAULT_GAME_SETTINGS_ROW
+    } catch (err) {
+      applyGameSettingsRow(DEFAULT_GAME_SETTINGS_ROW)
+      setGameSettingsError(formatAdminError('Game settings loading failed', err, 'Failed to load game settings.'))
+      return DEFAULT_GAME_SETTINGS_ROW
+    } finally {
+      setIsLoadingGameSettings(false)
+    }
+  }
+
+  async function handleSaveGameSettings(event) {
+    event.preventDefault()
+    setGameSettingsMessage('')
+    setGameSettingsError('')
+
+    const parsedSprintSeconds = Number(gameSettingsSprintSeconds)
+
+    if (!Number.isInteger(parsedSprintSeconds) || parsedSprintSeconds <= 0) {
+      setGameSettingsError('Sprint duration must be a positive whole number of seconds.')
+      return
+    }
+
+    setIsSavingGameSettings(true)
+
+    try {
+      await upsertInto('game_settings', {
+        id: 'default',
+        debug_enabled: gameSettingsDebugEnabled,
+        sprint_seconds: parsedSprintSeconds,
+        show_correct_answers: gameSettingsShowCorrectAnswers,
+        updated_at: new Date().toISOString()
+      })
+
+      setGameSettingsMessage('Game settings saved successfully.')
+    } catch (err) {
+      setGameSettingsError(formatAdminError('Game settings save failed', err, 'Failed to save game settings.'))
+    } finally {
+      setIsSavingGameSettings(false)
+    }
+  }
+
   async function loadQuestionMatrixQuestions() {
     setIsLoadingQuestionMatrix(true)
     setQuestionMatrixError('')
@@ -852,7 +932,7 @@ function AdminPage() {
 
     async function initializeCategories() {
       try {
-        await Promise.all([loadCategories(), loadSources(), loadQuestionMatrixQuestions()])
+        await Promise.all([loadCategories(), loadSources(), loadQuestionMatrixQuestions(), loadGameSettings()])
       } finally {
         setIsLoading(false)
       }
@@ -1568,6 +1648,68 @@ function AdminPage() {
           )
         ) : null}
       </details>
+        </details>
+
+        <details
+          id="admin-game-settings"
+          className="admin-section"
+          open={openAdminSectionId === 'admin-game-settings'}
+          onToggle={(event) => handleAdminSectionToggle(event, 'admin-game-settings')}
+          tabIndex="-1"
+        >
+          <summary className="admin-section-summary">Game Settings</summary>
+          <div className="admin-section-heading-row">
+            <div>
+              <h3>Game Settings</h3>
+              <p>Control public debug behavior without editing code. Regular mode always falls back to a 60-second sprint.</p>
+            </div>
+          </div>
+
+          {gameSettingsDebugEnabled ? (
+            <p className="admin-section-message admin-section-message-warning" role="alert">
+              Debug mode is visible in the public game. Turn it off before release.
+            </p>
+          ) : null}
+          {gameSettingsMessage ? <p className="admin-section-message admin-section-message-success">{gameSettingsMessage}</p> : null}
+          {gameSettingsError ? <p className="admin-section-message admin-section-message-error" role="alert">{gameSettingsError}</p> : null}
+          {isLoadingGameSettings ? <p>Loading game settings...</p> : null}
+
+          <form className="admin-game-settings-form" onSubmit={handleSaveGameSettings}>
+            <label htmlFor="game-settings-debug-enabled">Debug mode</label>
+            <input
+              id="game-settings-debug-enabled"
+              type="checkbox"
+              checked={gameSettingsDebugEnabled}
+              onChange={(event) => setGameSettingsDebugEnabled(event.target.checked)}
+            />
+
+            <label htmlFor="game-settings-sprint-seconds">Sprint duration</label>
+            <select
+              id="game-settings-sprint-seconds"
+              value={gameSettingsSprintSeconds}
+              onChange={(event) => setGameSettingsSprintSeconds(event.target.value)}
+            >
+              {SPRINT_DURATION_OPTIONS.map((seconds) => (
+                <option key={seconds} value={seconds}>
+                  {seconds} seconds
+                </option>
+              ))}
+            </select>
+
+            <label htmlFor="game-settings-show-correct">Show correct answers</label>
+            <input
+              id="game-settings-show-correct"
+              type="checkbox"
+              checked={gameSettingsShowCorrectAnswers}
+              onChange={(event) => setGameSettingsShowCorrectAnswers(event.target.checked)}
+            />
+
+            <div className="admin-form-actions">
+              <button type="submit" disabled={isSavingGameSettings}>
+                {isSavingGameSettings ? 'Saving…' : 'Save settings'}
+              </button>
+            </div>
+          </form>
         </details>
 
         <details

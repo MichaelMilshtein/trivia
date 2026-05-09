@@ -9,16 +9,19 @@ const GAME_DEBUG_CONFIG = {
 }
 
 const REGULAR_SPRINT_SECONDS = 60
-const SPRINT_SECONDS = GAME_DEBUG_CONFIG.enabled ? GAME_DEBUG_CONFIG.sprintSeconds : REGULAR_SPRINT_SECONDS
-const SHOW_CORRECT_ANSWER_DEBUG = GAME_DEBUG_CONFIG.enabled && GAME_DEBUG_CONFIG.showCorrectAnswers
+const DEFAULT_GAME_SETTINGS = {
+  debugEnabled: GAME_DEBUG_CONFIG.enabled,
+  sprintSeconds: GAME_DEBUG_CONFIG.enabled ? GAME_DEBUG_CONFIG.sprintSeconds : REGULAR_SPRINT_SECONDS,
+  showCorrectAnswers: GAME_DEBUG_CONFIG.enabled && GAME_DEBUG_CONFIG.showCorrectAnswers
+}
 
 const GAME_MODES = {
   sprint: {
     id: 'sprint',
-    name: '60-Second Sprint',
+    name: (sprintSeconds) => `${sprintSeconds}-Second Sprint`,
     shortName: 'Sprint',
     tagline: 'Race the clock',
-    description: `You have ${SPRINT_SECONDS} seconds to answer as many questions as possible.`,
+    description: (sprintSeconds) => `You have ${sprintSeconds} seconds to answer as many questions as possible.`,
     statusLabel: 'Timer',
     icon: 'stopwatch'
   },
@@ -107,6 +110,33 @@ const PUBLIC_SECTION_MAPPINGS = PUBLIC_SECTION_GROUPS.reduce((accumulator, secti
 
   return accumulator
 }, {})
+
+function normalizeGameSettings(settingsRow) {
+  const debugEnabled = Boolean(settingsRow?.debug_enabled)
+  const sprintSeconds = Number(settingsRow?.sprint_seconds)
+
+  return {
+    debugEnabled,
+    sprintSeconds: debugEnabled && Number.isInteger(sprintSeconds) && sprintSeconds > 0 ? sprintSeconds : REGULAR_SPRINT_SECONDS,
+    showCorrectAnswers: debugEnabled && Boolean(settingsRow?.show_correct_answers)
+  }
+}
+
+async function fetchGameSettings() {
+  try {
+    const rows = await selectFrom('game_settings', {
+      columns: 'id,debug_enabled,sprint_seconds,show_correct_answers',
+      filters: {
+        id: 'eq.default',
+        limit: '1'
+      }
+    })
+
+    return normalizeGameSettings(rows[0])
+  } catch {
+    return DEFAULT_GAME_SETTINGS
+  }
+}
 
 async function fetchActiveQuestionsForSources(sourceIds) {
   if (!sourceIds.length) {
@@ -396,7 +426,8 @@ function GamePage() {
   const [correctCount, setCorrectCount] = useState(0)
   const [attemptedCount, setAttemptedCount] = useState(0)
   const [livesRemaining, setLivesRemaining] = useState(MAX_MISTAKES_IN_LIVES_MODE + 1)
-  const [secondsRemaining, setSecondsRemaining] = useState(SPRINT_SECONDS)
+  const [gameSettings, setGameSettings] = useState(DEFAULT_GAME_SETTINGS)
+  const [secondsRemaining, setSecondsRemaining] = useState(DEFAULT_GAME_SETTINGS.sprintSeconds)
   const [shouldEndAfterFeedback, setShouldEndAfterFeedback] = useState(false)
   const [isGameSoundMuted, setIsGameSoundMuted] = useState(false)
   const [results, setResults] = useState(null)
@@ -411,7 +442,8 @@ function GamePage() {
       setError('')
 
       try {
-        const [sourceRows, categoryRows] = await Promise.all([
+        const [settings, sourceRows, categoryRows] = await Promise.all([
+          fetchGameSettings(),
           selectFrom('sources', {
             columns:
               'id,short_title,full_title,front_cover_image_url,back_cover_image_url,description,author,store_url,display_order,is_active',
@@ -438,6 +470,8 @@ function GamePage() {
           return getSourceTitle(sourceA).localeCompare(getSourceTitle(sourceB))
         })
 
+        setGameSettings(settings)
+        setSecondsRemaining(settings.sprintSeconds)
         setSources(sortedSources)
         setCategories(categoryRows)
       } catch (err) {
@@ -562,6 +596,7 @@ function GamePage() {
   }, [selectedSectionKeys, sourceQuestions])
 
   const currentQuestion = questionQueue[currentQuestionIndex]
+  const showCorrectAnswerDebug = gameSettings.debugEnabled && gameSettings.showCorrectAnswers
   const isFinalLifeFailureFeedback =
     selectedModeId === GAME_MODES.lives.id &&
     selectedAnswerIndex !== null &&
@@ -765,7 +800,7 @@ function GamePage() {
     setCorrectCount(0)
     setAttemptedCount(0)
     setLivesRemaining(MAX_MISTAKES_IN_LIVES_MODE + 1)
-    setSecondsRemaining(SPRINT_SECONDS)
+    setSecondsRemaining(gameSettings.sprintSeconds)
     setShouldEndAfterFeedback(false)
     setResults(null)
     setStep('play')
@@ -861,7 +896,7 @@ function GamePage() {
     setCorrectCount(0)
     setAttemptedCount(0)
     setLivesRemaining(MAX_MISTAKES_IN_LIVES_MODE + 1)
-    setSecondsRemaining(SPRINT_SECONDS)
+    setSecondsRemaining(gameSettings.sprintSeconds)
     setShouldEndAfterFeedback(false)
     setResults(null)
     setError('')
@@ -1097,8 +1132,8 @@ function GamePage() {
               >
                 <span className="mode-card-icon" aria-hidden="true"><ChallengeIcon type={mode.icon} /></span>
                 <span className="mode-card-tagline">{mode.tagline}</span>
-                <strong>{mode.name}</strong>
-                <small>{mode.description}</small>
+                <strong>{typeof mode.name === 'function' ? mode.name(gameSettings.sprintSeconds) : mode.name}</strong>
+                <small>{typeof mode.description === 'function' ? mode.description(gameSettings.sprintSeconds) : mode.description}</small>
               </button>
             ))}
           </div>
@@ -1146,6 +1181,12 @@ function GamePage() {
             <span style={{ width: `${Math.min(100, Math.max(8, ((currentQuestionIndex + 1) / Math.max(1, questionQueue.length)) * 100))}%` }} />
           </div>
 
+          {gameSettings.debugEnabled ? (
+            <p className="game-debug-notice">
+              Debug mode is on{showCorrectAnswerDebug ? ' — correct answers are highlighted.' : '.'}
+            </p>
+          ) : null}
+
           <article className="question-card">
             <div className="question-pill-row" aria-label="Question metadata">
               <span className={getSourcePillClassName(currentQuestionSourceTitle)}>{currentQuestionSourceTitle}</span>
@@ -1169,7 +1210,7 @@ function GamePage() {
                 const isCorrectChoice = choice.index === Number(currentQuestion.correct_index)
                 let buttonClassName = 'answer-button'
 
-                if ((selectedAnswerIndex !== null || SHOW_CORRECT_ANSWER_DEBUG) && isCorrectChoice) {
+                if ((selectedAnswerIndex !== null || showCorrectAnswerDebug) && isCorrectChoice) {
                   buttonClassName += ' answer-button-correct'
                 } else if (isSelected && !isCorrectChoice) {
                   buttonClassName += ' answer-button-incorrect'
