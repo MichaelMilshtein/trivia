@@ -105,6 +105,120 @@ body {
   background: var(--admin-bg);
 }
 
+.admin-auth-page {
+  display: grid;
+  min-height: calc(100vh - 4.75rem);
+  place-items: center;
+  padding: 1.25rem;
+  background: #f8fafc;
+}
+
+.admin-auth-card {
+  width: min(100%, 440px);
+  padding: 1.5rem;
+  border: 1px solid #d9e2ec;
+  border-radius: 1rem;
+  background: #ffffff;
+  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.08);
+}
+
+.admin-auth-card h2 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.admin-auth-copy {
+  margin: 0.6rem 0 1rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.admin-auth-form {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.admin-auth-form label {
+  color: #334155;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.admin-auth-form input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.55rem;
+  padding: 0.58rem 0.7rem;
+  color: #0f172a;
+  background: #ffffff;
+  font: inherit;
+}
+
+.admin-auth-card button,
+.admin-auth-form button {
+  width: fit-content;
+  border: 1px solid #1d4ed8;
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.85rem;
+  color: #ffffff;
+  background: #2563eb;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-auth-card button:hover:not(:disabled),
+.admin-auth-form button:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.admin-auth-card button:disabled,
+.admin-auth-form button:disabled {
+  border-color: #cbd5e1;
+  color: #64748b;
+  background: #e2e8f0;
+  cursor: not-allowed;
+}
+
+.admin-auth-message {
+  min-height: 1.35rem;
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.admin-sidebar-auth {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-sidebar-auth-email {
+  overflow: hidden;
+  color: var(--admin-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-page .admin-sidebar-auth button {
+  border-color: #cbd5e1;
+  color: #334155;
+  background: #ffffff;
+}
+
+.admin-page .admin-sidebar-auth button:hover:not(:disabled) {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.admin-sidebar-collapsed .admin-sidebar-auth {
+  display: none;
+}
+
+
 .admin-page :target {
   scroll-margin-top: 1rem;
 }
