@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getCoverVariantPath } from '../lib/bookCovers'
 import { selectFrom } from '../lib/supabaseClient'
 
@@ -157,6 +157,21 @@ function handleCoverImageError(event, fallbackImageUrl) {
   }
 
   event.currentTarget.hidden = true
+}
+
+function isTextEntryElement(element) {
+  if (!element) {
+    return false
+  }
+
+  const tagName = element.tagName?.toLowerCase()
+
+  return (
+    tagName === 'input' ||
+    tagName === 'textarea' ||
+    tagName === 'select' ||
+    element.isContentEditable
+  )
 }
 
 function getChoiceEntries(question) {
@@ -352,7 +367,9 @@ function GamePage() {
   const [livesRemaining, setLivesRemaining] = useState(MAX_MISTAKES_IN_LIVES_MODE + 1)
   const [secondsRemaining, setSecondsRemaining] = useState(SPRINT_SECONDS)
   const [shouldEndAfterFeedback, setShouldEndAfterFeedback] = useState(false)
+  const [isGameSoundMuted, setIsGameSoundMuted] = useState(false)
   const [results, setResults] = useState(null)
+  const gameAudioContextRef = useRef(null)
   const [step, setStep] = useState('book')
   const [isLoadingSources, setIsLoadingSources] = useState(true)
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
@@ -419,6 +436,36 @@ function GamePage() {
       finishGame()
     }
   }, [secondsRemaining, selectedModeId, step])
+
+
+  useEffect(() => {
+    return () => {
+      if (gameAudioContextRef.current) {
+        gameAudioContextRef.current.close().catch(() => {})
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    function handleQuestionKeyDown(event) {
+      if (
+        event.key !== 'Enter' ||
+        step !== 'play' ||
+        selectedAnswerIndex === null ||
+        !currentQuestion ||
+        isTextEntryElement(event.target)
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      moveToNextQuestion()
+    }
+
+    window.addEventListener('keydown', handleQuestionKeyDown)
+
+    return () => window.removeEventListener('keydown', handleQuestionKeyDown)
+  })
 
   const selectedSources = useMemo(
     () => sources.filter((source) => selectedSourceIds.includes(String(source.id))),
@@ -497,6 +544,63 @@ function GamePage() {
   ]
     .filter(Boolean)
     .join(' ')
+
+  function toggleGameSound() {
+    setIsGameSoundMuted((currentIsMuted) => !currentIsMuted)
+  }
+
+  function getGameAudioContext() {
+    if (isGameSoundMuted || typeof window === 'undefined') {
+      return null
+    }
+
+    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext
+
+    if (!AudioContextConstructor) {
+      return null
+    }
+
+    if (!gameAudioContextRef.current) {
+      gameAudioContextRef.current = new AudioContextConstructor()
+    }
+
+    return gameAudioContextRef.current
+  }
+
+  function playAnswerFeedbackSound(isCorrect) {
+    const audioContext = getGameAudioContext()
+
+    if (!audioContext) {
+      return
+    }
+
+    try {
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {})
+      }
+
+      const startTime = audioContext.currentTime
+      const masterGain = audioContext.createGain()
+      masterGain.gain.setValueAtTime(0.0001, startTime)
+      masterGain.gain.exponentialRampToValueAtTime(isCorrect ? 0.055 : 0.035, startTime + 0.015)
+      masterGain.gain.exponentialRampToValueAtTime(0.0001, startTime + (isCorrect ? 0.34 : 0.24))
+      masterGain.connect(audioContext.destination)
+
+      const frequencies = isCorrect ? [523.25, 659.25] : [220, 164.81]
+      const toneSpacing = isCorrect ? 0.08 : 0.045
+
+      frequencies.forEach((frequency, index) => {
+        const oscillator = audioContext.createOscillator()
+        oscillator.type = isCorrect ? 'sine' : 'triangle'
+        oscillator.frequency.setValueAtTime(frequency, startTime + index * toneSpacing)
+        oscillator.connect(masterGain)
+        oscillator.start(startTime + index * toneSpacing)
+        oscillator.stop(startTime + (isCorrect ? 0.32 : 0.22))
+      })
+    } catch {
+      // Browser audio policies can vary; silently skip game sounds if playback is unavailable.
+    }
+  }
 
   function toggleSelectedSource(sourceId) {
     const sourceIdValue = String(sourceId)
@@ -615,6 +719,7 @@ function GamePage() {
     const isLastQuestion = currentQuestionIndex >= questionQueue.length - 1
     const shouldEndForLives = selectedModeId === GAME_MODES.lives.id && nextLivesRemaining === 0
 
+    playAnswerFeedbackSound(isCorrect)
     setSelectedAnswerIndex(choiceIndex)
     setLastAnswerWasCorrect(isCorrect)
     setCorrectCount(nextCorrectCount)
@@ -722,6 +827,16 @@ function GamePage() {
           <div className="game-title-lockup">
             <h2>{stepLabels[step]}</h2>
           </div>
+          <button
+            className="game-sound-toggle"
+            type="button"
+            onClick={toggleGameSound}
+            aria-pressed={isGameSoundMuted}
+            aria-label={isGameSoundMuted ? 'Unmute game sounds' : 'Mute game sounds'}
+          >
+            <span aria-hidden="true">{isGameSoundMuted ? '🔇' : '🔈'}</span>
+            <span>{isGameSoundMuted ? 'Muted' : 'Sound'}</span>
+          </button>
         </header>
 
       {error ? <p className="game-error">{error}</p> : null}

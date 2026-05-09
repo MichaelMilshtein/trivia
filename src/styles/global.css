@@ -488,6 +488,12 @@ body {
   white-space: nowrap;
 }
 
+.admin-question-empty-cell {
+  color: var(--admin-muted);
+  font-weight: 700;
+  text-align: center;
+}
+
 .admin-filter-action-spacer {
   display: block;
 }
@@ -1434,7 +1440,7 @@ body {
 
 .game-arcade-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.65rem;
   margin-bottom: 0.7rem;
@@ -1489,6 +1495,29 @@ body {
 .game-back-button:disabled {
   opacity: 0;
   pointer-events: none;
+}
+
+.game-sound-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid rgba(255, 248, 232, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--game-cream);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.game-sound-toggle:hover,
+.game-sound-toggle:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
 }
 
 .game-stepper {
