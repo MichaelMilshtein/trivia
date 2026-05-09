@@ -71,11 +71,11 @@ const QUESTION_SORT_FIELDS = {
 }
 
 const ADMIN_NAV_ITEMS = [
-  { id: 'admin-overview', href: '#admin-overview', label: 'Dashboard / Overview' },
-  { id: 'admin-sources', href: '#admin-sources', label: 'Book Sources' },
-  { id: 'admin-categories', href: '#admin-categories', label: 'Categories' },
-  { id: 'admin-question-import', href: '#admin-question-import', label: 'Question Import' },
-  { id: 'admin-questions-list', href: '#admin-questions-list', label: 'Question List' }
+  { id: 'admin-overview', href: '#admin-overview', label: 'Dashboard / Overview', icon: '▦' },
+  { id: 'admin-sources', href: '#admin-sources', label: 'Book Sources', icon: '▤' },
+  { id: 'admin-categories', href: '#admin-categories', label: 'Categories', icon: '◇' },
+  { id: 'admin-question-import', href: '#admin-question-import', label: 'Question Import', icon: '↥' },
+  { id: 'admin-questions-list', href: '#admin-questions-list', label: 'Question List', icon: '☰' }
 ]
 
 function AdminPage() {
@@ -135,8 +135,16 @@ function AdminPage() {
   const [listCategoryId, setListCategoryId] = useState('')
   const [listSourceIdFilter, setListSourceIdFilter] = useState('')
   const [listActiveFilter, setListActiveFilter] = useState('all')
-  const [listSectionSearch, setListSectionSearch] = useState('')
   const [listQuestionTypeFilter, setListQuestionTypeFilter] = useState('all')
+  const [questionColumnFilters, setQuestionColumnFilters] = useState({
+    question: '',
+    source: '',
+    section: '',
+    category: '',
+    type: 'all',
+    difficulty: 'all',
+    active: 'all'
+  })
   const [editingQuestionId, setEditingQuestionId] = useState('')
   const [editQuestionText, setEditQuestionText] = useState('')
   const [editChoiceA, setEditChoiceA] = useState('')
@@ -168,6 +176,7 @@ function AdminPage() {
   const [isLoadingQuestionMatrix, setIsLoadingQuestionMatrix] = useState(false)
   const [questionMatrixError, setQuestionMatrixError] = useState('')
   const [openAdminSectionId, setOpenAdminSectionId] = useState('admin-overview')
+  const [isAdminSidebarCollapsed, setIsAdminSidebarCollapsed] = useState(false)
 
   const sourceShortTitlesById = useMemo(
     () =>
@@ -301,31 +310,88 @@ function AdminPage() {
     [categories]
   )
 
+  const questionTypeOptions = useMemo(() => {
+    const typeValues = new Set(categoryQuestions.map((question) => question.question_type || 'mc_single'))
+    return [...typeValues].sort((typeA, typeB) => typeA.localeCompare(typeB))
+  }, [categoryQuestions])
+
+  const questionDifficultyOptions = useMemo(() => {
+    const difficultyValues = new Set(
+      categoryQuestions.map((question) => question.difficulty || 'unknown')
+    )
+    return [...difficultyValues].sort((difficultyA, difficultyB) =>
+      difficultyA.localeCompare(difficultyB)
+    )
+  }, [categoryQuestions])
+
   const filteredCategoryQuestions = useMemo(() => {
-    const normalizedSectionSearch = listSectionSearch.trim().toLowerCase()
+    const normalizedQuestionFilter = questionColumnFilters.question.trim().toLowerCase()
+    const normalizedSectionFilter = questionColumnFilters.section.trim().toLowerCase()
 
     const filteredQuestions = categoryQuestions.filter((question) => {
-      const sourceMatches =
-        listSourceIdFilter ? String(question.source_id || '') === listSourceIdFilter : true
+      const sourceId = String(question.source_id || '')
+      const categoryId = String(question.category_id || '')
+      const questionType = question.question_type || 'mc_single'
+      const difficulty = question.difficulty || 'unknown'
+      const isActive = Boolean(question.is_active)
+
+      const sourceMatches = listSourceIdFilter ? sourceId === listSourceIdFilter : true
+      const categoryMatches = listCategoryId ? categoryId === listCategoryId : true
 
       const activeMatches =
         listActiveFilter === 'all'
           ? true
           : listActiveFilter === 'active'
-            ? Boolean(question.is_active)
-            : !question.is_active
-
-      const sectionText = (question.section || '').toLowerCase()
-      const sectionMatches = normalizedSectionSearch
-        ? sectionText.includes(normalizedSectionSearch)
-        : true
+            ? isActive
+            : !isActive
 
       const questionTypeMatches =
-        listQuestionTypeFilter === 'all'
-          ? true
-          : (question.question_type || 'mc_single') === listQuestionTypeFilter
+        listQuestionTypeFilter === 'all' ? true : questionType === listQuestionTypeFilter
 
-      return sourceMatches && activeMatches && sectionMatches && questionTypeMatches
+      const questionColumnMatches = normalizedQuestionFilter
+        ? (question.question_text || '').toLowerCase().includes(normalizedQuestionFilter)
+        : true
+
+      const sourceColumnMatches = questionColumnFilters.source
+        ? sourceId === questionColumnFilters.source
+        : true
+
+      const sectionColumnMatches = normalizedSectionFilter
+        ? (question.section || '').toLowerCase().includes(normalizedSectionFilter)
+        : true
+
+      const categoryColumnMatches = questionColumnFilters.category
+        ? categoryId === questionColumnFilters.category
+        : true
+
+      const typeColumnMatches =
+        questionColumnFilters.type === 'all' ? true : questionType === questionColumnFilters.type
+
+      const difficultyColumnMatches =
+        questionColumnFilters.difficulty === 'all'
+          ? true
+          : difficulty === questionColumnFilters.difficulty
+
+      const activeColumnMatches =
+        questionColumnFilters.active === 'all'
+          ? true
+          : questionColumnFilters.active === 'active'
+            ? isActive
+            : !isActive
+
+      return (
+        sourceMatches &&
+        categoryMatches &&
+        activeMatches &&
+        questionTypeMatches &&
+        questionColumnMatches &&
+        sourceColumnMatches &&
+        sectionColumnMatches &&
+        categoryColumnMatches &&
+        typeColumnMatches &&
+        difficultyColumnMatches &&
+        activeColumnMatches
+      )
     })
 
     return [...filteredQuestions].sort((questionA, questionB) => {
@@ -369,9 +435,10 @@ function AdminPage() {
   }, [
     categoryQuestions,
     listSourceIdFilter,
+    listCategoryId,
     listActiveFilter,
-    listSectionSearch,
     listQuestionTypeFilter,
+    questionColumnFilters,
     sourceShortTitlesById,
     categoryNamesById,
     questionSortField,
@@ -501,9 +568,13 @@ function AdminPage() {
     }
   }
 
-  async function fetchCategoryQuestions(sourceId, categoryId = '') {
+  async function fetchCategoryQuestions(sourceId = '', categoryId = '') {
     const filters = {
-      source_id: `eq.${sourceId}`
+      order: 'id.desc'
+    }
+
+    if (sourceId) {
+      filters.source_id = `eq.${sourceId}`
     }
 
     if (categoryId) {
@@ -516,12 +587,7 @@ function AdminPage() {
     })
   }
 
-  async function refreshCategoryQuestions(sourceId = listSourceIdFilter, categoryId = listCategoryId) {
-    if (!sourceId) {
-      setCategoryQuestions([])
-      return
-    }
-
+  async function refreshCategoryQuestions(sourceId = '', categoryId = '') {
     const rows = await fetchCategoryQuestions(sourceId, categoryId)
     setCategoryQuestions(rows)
   }
@@ -649,6 +715,33 @@ function AdminPage() {
     setQuestionDrawerMode('')
   }
 
+  function updateQuestionColumnFilter(filterName, filterValue) {
+    setQuestionColumnFilters((currentFilters) => ({
+      ...currentFilters,
+      [filterName]: filterValue
+    }))
+  }
+
+  function resetQuestionListFilters() {
+    setListSourceIdFilter('')
+    setListCategoryId('')
+    setListActiveFilter('all')
+    setListQuestionTypeFilter('all')
+    setQuestionSearchInput('')
+    setDebouncedQuestionSearch('')
+    setSearchResults([])
+    setSearchQuestionsError('')
+    setQuestionColumnFilters({
+      question: '',
+      source: '',
+      section: '',
+      category: '',
+      type: 'all',
+      difficulty: 'all',
+      active: 'all'
+    })
+  }
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedQuestionSearch(questionSearchInput.trim())
@@ -708,13 +801,6 @@ function AdminPage() {
 
   useEffect(() => {
     async function loadQuestionsForCategory() {
-      if (!listSourceIdFilter) {
-        setCategoryQuestions([])
-        setQuestionsError('')
-        resetQuestionEditForm()
-        return
-      }
-
       setIsLoadingQuestions(true)
       setQuestionsError('')
 
@@ -730,6 +816,36 @@ function AdminPage() {
 
     loadQuestionsForCategory()
   }, [listSourceIdFilter, listCategoryId])
+
+  useEffect(() => {
+    if (!categoryDrawerMode && !sourceDrawerMode && !questionDrawerMode) {
+      return undefined
+    }
+
+    function handleDrawerKeyDown(event) {
+      if (event.key !== 'Escape') {
+        return
+      }
+
+      if (questionDrawerMode) {
+        closeQuestionDrawer()
+        return
+      }
+
+      if (sourceDrawerMode) {
+        closeSourceDrawer()
+        return
+      }
+
+      if (categoryDrawerMode) {
+        closeCategoryDrawer()
+      }
+    }
+
+    window.addEventListener('keydown', handleDrawerKeyDown)
+
+    return () => window.removeEventListener('keydown', handleDrawerKeyDown)
+  }, [categoryDrawerMode, sourceDrawerMode, questionDrawerMode])
 
   async function handleCreateCategory(event) {
     event.preventDefault()
@@ -1188,11 +1304,27 @@ function AdminPage() {
   }
 
   return (
-    <section className="admin-page">
-      <aside className="admin-sidebar" aria-label="Admin section navigation">
+    <section className={`admin-page${isAdminSidebarCollapsed ? ' admin-page-sidebar-collapsed' : ''}`}>
+      <aside
+        className={`admin-sidebar${isAdminSidebarCollapsed ? ' admin-sidebar-collapsed' : ''}`}
+        aria-label="Admin section navigation"
+      >
         <div className="admin-sidebar-card">
-          <p className="admin-sidebar-eyebrow">Workspace</p>
-          <h2>Admin</h2>
+          <div className="admin-sidebar-header">
+            <div className="admin-sidebar-title">
+              <p className="admin-sidebar-eyebrow">Workspace</p>
+              <h2>Admin</h2>
+            </div>
+            <button
+              type="button"
+              className="admin-sidebar-toggle"
+              onClick={() => setIsAdminSidebarCollapsed((isCollapsed) => !isCollapsed)}
+              aria-label={isAdminSidebarCollapsed ? 'Expand admin sidebar' : 'Collapse admin sidebar'}
+              aria-expanded={!isAdminSidebarCollapsed}
+            >
+              {isAdminSidebarCollapsed ? '›' : '‹'}
+            </button>
+          </div>
           <nav>
             <ul className="admin-sidebar-list">
               {ADMIN_NAV_ITEMS.map((item) => (
@@ -1202,8 +1334,10 @@ function AdminPage() {
                     className={openAdminSectionId === item.id ? 'is-active' : undefined}
                     aria-current={openAdminSectionId === item.id ? 'true' : undefined}
                     onClick={(event) => handleAdminNavClick(event, item.id)}
+                    title={item.label}
                   >
-                    {item.label}
+                    <span className="admin-sidebar-icon" aria-hidden="true">{item.icon}</span>
+                    <span className="admin-sidebar-label">{item.label}</span>
                   </a>
                 </li>
               ))}
@@ -1571,7 +1705,7 @@ function AdminPage() {
           </div>
           <button type="button" onClick={openNewQuestionDrawer}>New question</button>
         </div>
-        {listSourceIdFilter && filteredCategoryQuestions.length > 0 ? (
+        {filteredCategoryQuestions.length > 0 ? (
           <p className="admin-row-count">Rows: {filteredCategoryQuestions.length}</p>
         ) : null}
         <div className="admin-filters">
@@ -1581,9 +1715,8 @@ function AdminPage() {
             name="list_source_filter"
             value={listSourceIdFilter}
             onChange={(event) => setListSourceIdFilter(event.target.value)}
-            required
           >
-            <option value="">Choose a source</option>
+            <option value="">All sources</option>
             {sources.map((source) => (
               <option key={source.id} value={source.id}>
                 {source.short_title}
@@ -1591,7 +1724,7 @@ function AdminPage() {
             ))}
           </select>
 
-          <label htmlFor="list-category-filter">Category (optional)</label>
+          <label htmlFor="list-category-filter">Category</label>
           <select
             id="list-category-filter"
             name="list_category_filter"
@@ -1618,15 +1751,6 @@ function AdminPage() {
             <option value="inactive">Inactive only</option>
           </select>
 
-          <label htmlFor="list-section-search">Section search</label>
-          <input
-            id="list-section-search"
-            name="list_section_search"
-            type="text"
-            value={listSectionSearch}
-            onChange={(event) => setListSectionSearch(event.target.value)}
-            placeholder="Search section text"
-          />
 
           <label htmlFor="list-question-type-filter">Question type</label>
           <select
@@ -1636,11 +1760,19 @@ function AdminPage() {
             onChange={(event) => setListQuestionTypeFilter(event.target.value)}
           >
             <option value="all">All</option>
-            <option value="mc_single">mc_single</option>
+            {questionTypeOptions.map((questionType) => (
+              <option key={questionType} value={questionType}>
+                {questionType}
+              </option>
+            ))}
           </select>
+
+          <span className="admin-filter-action-spacer" aria-hidden="true" />
+          <button type="button" className="admin-secondary-button" onClick={resetQuestionListFilters}>
+            Reset filters
+          </button>
         </div>
 
-        {!listSourceIdFilter ? <p>Select a source to view questions.</p> : null}
         {isLoadingQuestions ? <p>Loading questions...</p> : null}
         {questionsError ? <p>{questionsError}</p> : null}
         {questionActiveMessage ? <p>{questionActiveMessage}</p> : null}
@@ -1702,7 +1834,7 @@ function AdminPage() {
           {questionUpdateError ? <p>{questionUpdateError}</p> : null}
         </div>
 
-        {listSourceIdFilter && !isLoadingQuestions && !questionsError ? (
+        {!isLoadingQuestions && !questionsError ? (
           filteredCategoryQuestions.length > 0 ? (
             <table className="admin-question-table">
               <thead>
@@ -1755,6 +1887,105 @@ function AdminPage() {
                     </button>
                   </th>
                   <th scope="col">Actions</th>
+                </tr>
+                <tr className="admin-question-filter-row">
+                  <th scope="col">
+                    <label className="admin-sr-only" htmlFor="question-column-filter-question">Filter question</label>
+                    <input
+                      id="question-column-filter-question"
+                      type="text"
+                      value={questionColumnFilters.question}
+                      onChange={(event) => updateQuestionColumnFilter('question', event.target.value)}
+                      placeholder="Filter question"
+                    />
+                  </th>
+                  <th scope="col">
+                    <label className="admin-sr-only" htmlFor="question-column-filter-source">Filter source</label>
+                    <select
+                      id="question-column-filter-source"
+                      value={questionColumnFilters.source}
+                      onChange={(event) => updateQuestionColumnFilter('source', event.target.value)}
+                    >
+                      <option value="">All sources</option>
+                      {sources.map((source) => (
+                        <option key={source.id} value={source.id}>
+                          {source.short_title}
+                        </option>
+                      ))}
+                    </select>
+                  </th>
+                  <th scope="col">
+                    <label className="admin-sr-only" htmlFor="question-column-filter-section">Filter section</label>
+                    <input
+                      id="question-column-filter-section"
+                      type="text"
+                      value={questionColumnFilters.section}
+                      onChange={(event) => updateQuestionColumnFilter('section', event.target.value)}
+                      placeholder="Filter section"
+                    />
+                  </th>
+                  <th scope="col">
+                    <label className="admin-sr-only" htmlFor="question-column-filter-category">Filter category</label>
+                    <select
+                      id="question-column-filter-category"
+                      value={questionColumnFilters.category}
+                      onChange={(event) => updateQuestionColumnFilter('category', event.target.value)}
+                    >
+                      <option value="">All categories</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </th>
+                  <th scope="col">
+                    <label className="admin-sr-only" htmlFor="question-column-filter-type">Filter type</label>
+                    <select
+                      id="question-column-filter-type"
+                      value={questionColumnFilters.type}
+                      onChange={(event) => updateQuestionColumnFilter('type', event.target.value)}
+                    >
+                      <option value="all">All types</option>
+                      {questionTypeOptions.map((questionType) => (
+                        <option key={questionType} value={questionType}>
+                          {questionType}
+                        </option>
+                      ))}
+                    </select>
+                  </th>
+                  <th scope="col">
+                    <label className="admin-sr-only" htmlFor="question-column-filter-difficulty">Filter difficulty</label>
+                    <select
+                      id="question-column-filter-difficulty"
+                      value={questionColumnFilters.difficulty}
+                      onChange={(event) => updateQuestionColumnFilter('difficulty', event.target.value)}
+                    >
+                      <option value="all">All difficulties</option>
+                      {questionDifficultyOptions.map((difficulty) => (
+                        <option key={difficulty} value={difficulty}>
+                          {difficulty}
+                        </option>
+                      ))}
+                    </select>
+                  </th>
+                  <th scope="col">
+                    <label className="admin-sr-only" htmlFor="question-column-filter-active">Filter active status</label>
+                    <select
+                      id="question-column-filter-active"
+                      value={questionColumnFilters.active}
+                      onChange={(event) => updateQuestionColumnFilter('active', event.target.value)}
+                    >
+                      <option value="all">All</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </th>
+                  <th scope="col">
+                    <button type="button" className="admin-secondary-button" onClick={resetQuestionListFilters}>
+                      Reset
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
