@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  getCurrentAuthSession,
   insertInto,
   selectFrom,
-  signInWithPassword,
   signOut,
+  supabase,
   updateRows
 } from '../lib/supabaseClient'
 
@@ -90,8 +89,6 @@ const ADMIN_NAV_ITEMS = [
 function AdminPage() {
   const [authSession, setAuthSession] = useState(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
-  const [loginEmail, setLoginEmail] = useState('')
-  const [loginPassword, setLoginPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [isSigningIn, setIsSigningIn] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
@@ -505,18 +502,23 @@ function AdminPage() {
     )
   }
 
-  async function handleLoginSubmit(event) {
-    event.preventDefault()
+  async function handleGoogleSignIn() {
     setLoginError('')
     setIsSigningIn(true)
 
     try {
-      const session = await signInWithPassword(loginEmail.trim(), loginPassword)
-      setAuthSession(session)
-      setLoginPassword('')
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/admin`
+        }
+      })
+
+      if (oauthError) {
+        throw oauthError
+      }
     } catch (err) {
-      setLoginError(err instanceof Error ? err.message : 'Unable to sign in.')
-    } finally {
+      setLoginError(err instanceof Error ? err.message : 'Unable to sign in with Google.')
       setIsSigningIn(false)
     }
   }
@@ -770,10 +772,14 @@ function AdminPage() {
 
     async function initializeAuthSession() {
       try {
-        const session = await getCurrentAuthSession()
+        const { data, error: sessionError } = await supabase.auth.getSession()
+
+        if (sessionError) {
+          throw sessionError
+        }
 
         if (isMounted) {
-          setAuthSession(session)
+          setAuthSession(data.session)
         }
       } catch (err) {
         if (isMounted) {
@@ -1324,33 +1330,15 @@ function AdminPage() {
         <div className="admin-auth-card">
           <p className="admin-kicker">Admin access</p>
           <h2>Sign in to continue</h2>
-          <p className="admin-auth-copy">Use your Supabase email and password to open Admin tools.</p>
-          <form className="admin-auth-form" onSubmit={handleLoginSubmit}>
-            <label htmlFor="admin-login-email">Email</label>
-            <input
-              id="admin-login-email"
-              type="email"
-              autoComplete="email"
-              value={loginEmail}
-              onChange={(event) => setLoginEmail(event.target.value)}
-              required
-            />
-            <label htmlFor="admin-login-password">Password</label>
-            <input
-              id="admin-login-password"
-              type="password"
-              autoComplete="current-password"
-              value={loginPassword}
-              onChange={(event) => setLoginPassword(event.target.value)}
-              required
-            />
-            <button type="submit" disabled={isSigningIn}>
-              {isSigningIn ? 'Signing in…' : 'Sign in'}
+          <p className="admin-auth-copy">Use Google to open Admin tools.</p>
+          <div className="admin-auth-form">
+            <button type="button" onClick={handleGoogleSignIn} disabled={isSigningIn}>
+              {isSigningIn ? 'Redirecting to Google…' : 'Sign in with Google'}
             </button>
             <div className="admin-auth-message" role="alert" aria-live="polite">
               {loginError}
             </div>
-          </form>
+          </div>
         </div>
       </section>
     )
@@ -1361,7 +1349,7 @@ function AdminPage() {
       <section className="admin-auth-page">
         <div className="admin-auth-card">
           <p className="admin-kicker">Admin access</p>
-          <h2>This account is not authorized for Admin access</h2>
+          <h2>This account is not authorized for Admin access.</h2>
           <p className="admin-auth-copy">
             Signed in as <strong>{authSession.user?.email || 'unknown email'}</strong>.
           </p>
