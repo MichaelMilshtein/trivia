@@ -2,13 +2,23 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { getCoverVariantPath } from '../lib/bookCovers'
 import { selectFrom } from '../lib/supabaseClient'
 
+const GAME_DEBUG_CONFIG = {
+  enabled: false,
+  sprintSeconds: 20,
+  showCorrectAnswers: true
+}
+
+const REGULAR_SPRINT_SECONDS = 60
+const SPRINT_SECONDS = GAME_DEBUG_CONFIG.enabled ? GAME_DEBUG_CONFIG.sprintSeconds : REGULAR_SPRINT_SECONDS
+const SHOW_CORRECT_ANSWER_DEBUG = GAME_DEBUG_CONFIG.enabled && GAME_DEBUG_CONFIG.showCorrectAnswers
+
 const GAME_MODES = {
   sprint: {
     id: 'sprint',
     name: '60-Second Sprint',
     shortName: 'Sprint',
     tagline: 'Race the clock',
-    description: 'You have 20 seconds to answer as many questions as possible.',
+    description: `You have ${SPRINT_SECONDS} seconds to answer as many questions as possible.`,
     statusLabel: 'Timer',
     icon: 'stopwatch'
   },
@@ -23,9 +33,7 @@ const GAME_MODES = {
   }
 }
 
-const SPRINT_SECONDS = 20
 const MAX_MISTAKES_IN_LIVES_MODE = 2
-const SHOW_CORRECT_ANSWER_DEBUG = true
 const CHOICE_KEYS = ['A', 'B', 'C', 'D']
 const GAME_QUESTIONS_PAGE_SIZE = 1000
 const LENNY_AVATAR_IMAGE_URL = '/images/brand/lenny-lenski-avatar01.png'
