@@ -2435,3 +2435,151 @@ body {
   text-align: right;
   white-space: nowrap;
 }
+
+.admin-section-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.85rem;
+  background: var(--admin-panel-soft);
+}
+
+.admin-section-heading-row h3 {
+  margin: 0 0 0.25rem;
+}
+
+.admin-section-heading-row p {
+  margin: 0;
+  color: var(--admin-muted);
+}
+
+.admin-editor-anchor p {
+  margin: 0 0 0.75rem;
+}
+
+.admin-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.admin-drawer {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 560px);
+  height: 100%;
+  border-left: 1px solid var(--admin-border-strong);
+  background: var(--admin-panel);
+  box-shadow: -18px 0 45px rgba(15, 23, 42, 0.2);
+  animation: adminDrawerSlideIn 180ms ease-out;
+}
+
+.admin-drawer-wide {
+  width: min(100%, 640px);
+}
+
+.admin-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-drawer-header h3 {
+  margin: 0;
+}
+
+.admin-page .admin-drawer-close {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border-color: var(--admin-border-strong);
+  border-radius: 999px;
+  color: var(--admin-ink);
+  background: #ffffff;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.admin-page .admin-drawer-close:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.admin-page .admin-drawer-form {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0;
+  padding: 1rem 1.1rem 1.25rem;
+  border: 0;
+  border-radius: 0;
+  background: var(--admin-panel);
+}
+
+.admin-drawer-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-page .admin-secondary-button {
+  border-color: var(--admin-border-strong);
+  color: var(--admin-ink);
+  background: #ffffff;
+}
+
+.admin-page .admin-secondary-button:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+@keyframes adminDrawerSlideIn {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-section-heading-row {
+    flex-direction: column;
+  }
+
+  .admin-drawer-overlay {
+    justify-content: stretch;
+  }
+
+  .admin-drawer,
+  .admin-drawer-wide {
+    width: 100%;
+    border-left: 0;
+  }
+
+  .admin-drawer-actions {
+    justify-content: flex-start;
+  }
+}
+
+.admin-drawer-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #fecaca;
+  border-radius: 0.7rem;
+  color: #991b1b;
+  background: #fef2f2;
+  font-weight: 700;
+}

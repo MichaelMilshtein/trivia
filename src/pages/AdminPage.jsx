@@ -98,6 +98,7 @@ function AdminPage() {
   const [categoryUpdateMessage, setCategoryUpdateMessage] = useState('')
   const [categoryUpdateError, setCategoryUpdateError] = useState('')
   const [isUpdatingCategory, setIsUpdatingCategory] = useState(false)
+  const [categoryDrawerMode, setCategoryDrawerMode] = useState('')
   const [sourceShortTitle, setSourceShortTitle] = useState('')
   const [sourceFullTitle, setSourceFullTitle] = useState('')
   const [sourceFrontCoverImageUrl, setSourceFrontCoverImageUrl] = useState('')
@@ -123,6 +124,7 @@ function AdminPage() {
   const [sourceUpdateMessage, setSourceUpdateMessage] = useState('')
   const [sourceUpdateError, setSourceUpdateError] = useState('')
   const [isUpdatingSource, setIsUpdatingSource] = useState(false)
+  const [sourceDrawerMode, setSourceDrawerMode] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [selectedSourceId, setSelectedSourceId] = useState('')
   const [questionsJson, setQuestionsJson] = useState('')
@@ -153,6 +155,7 @@ function AdminPage() {
   const [isUpdatingQuestion, setIsUpdatingQuestion] = useState(false)
   const [questionUpdateMessage, setQuestionUpdateMessage] = useState('')
   const [questionUpdateError, setQuestionUpdateError] = useState('')
+  const [questionDrawerMode, setQuestionDrawerMode] = useState('')
   const [isTogglingQuestionActive, setIsTogglingQuestionActive] = useState(false)
   const [questionActiveMessage, setQuestionActiveMessage] = useState('')
   const [questionActiveError, setQuestionActiveError] = useState('')
@@ -582,6 +585,71 @@ function AdminPage() {
     setCategoryUpdateError('')
   }
 
+
+  function openNewCategoryDrawer() {
+    setName('')
+    setDescription('')
+    setIsActive(true)
+    setSubmitMessage('')
+    setSubmitError('')
+    setCategoryUpdateMessage('')
+    setCategoryUpdateError('')
+    setCategoryDrawerMode('new')
+  }
+
+  function openEditCategoryDrawer(category) {
+    loadCategoryIntoEditForm(category)
+    setCategoryDrawerMode('edit')
+  }
+
+  function closeCategoryDrawer() {
+    setCategoryDrawerMode('')
+  }
+
+  function openNewSourceDrawer() {
+    setSourceShortTitle('')
+    setSourceFullTitle('')
+    setSourceFrontCoverImageUrl('')
+    setSourceBackCoverImageUrl('')
+    setSourceDescription('')
+    setSourceStoreUrl('')
+    setSourceAuthor('')
+    setSourceDisplayOrder('0')
+    setSourceIsActive(true)
+    setSourceSubmitMessage('')
+    setSourceSubmitError('')
+    setSourceUpdateMessage('')
+    setSourceUpdateError('')
+    setSourceDrawerMode('new')
+  }
+
+  function openEditSourceDrawer(source) {
+    loadSourceIntoEditForm(source)
+    setSourceDrawerMode('edit')
+  }
+
+  function closeSourceDrawer() {
+    setSourceDrawerMode('')
+  }
+
+  function openNewQuestionDrawer() {
+    resetQuestionEditForm()
+    setEditSourceId(listSourceIdFilter || selectedSourceId || '')
+    setEditCategoryId(listCategoryId || selectedCategoryId || '')
+    setQuestionUpdateMessage('')
+    setQuestionUpdateError('')
+    setQuestionDrawerMode('new')
+  }
+
+  function openEditQuestionDrawer(question) {
+    loadQuestionIntoEditForm(question)
+    setQuestionDrawerMode('edit')
+  }
+
+  function closeQuestionDrawer() {
+    setQuestionDrawerMode('')
+  }
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedQuestionSearch(questionSearchInput.trim())
@@ -678,6 +746,7 @@ function AdminPage() {
       })
 
       setSubmitMessage('Category created successfully.')
+      setCategoryDrawerMode('')
       setName('')
       setDescription('')
       setIsActive(true)
@@ -718,6 +787,7 @@ function AdminPage() {
       )
 
       setCategoryUpdateMessage('Category updated successfully.')
+      setCategoryDrawerMode('')
       await loadCategories()
     } catch (err) {
       setCategoryUpdateError(err instanceof Error ? err.message : 'Failed to update category.')
@@ -846,6 +916,64 @@ function AdminPage() {
     }
   }
 
+  async function handleCreateQuestion(event) {
+    event.preventDefault()
+    setQuestionUpdateMessage('')
+    setQuestionUpdateError('')
+
+    const parsedCorrectIndex = Number(editCorrectIndex)
+
+    if (!Number.isInteger(parsedCorrectIndex) || parsedCorrectIndex < 0 || parsedCorrectIndex > 3) {
+      setQuestionUpdateError('Correct index must be an integer from 0 to 3.')
+      return
+    }
+
+    if (!editQuestionText.trim()) {
+      setQuestionUpdateError('Question text is required.')
+      return
+    }
+
+    setIsUpdatingQuestion(true)
+
+    try {
+      await insertInto('questions', {
+        question_text: editQuestionText.trim(),
+        choice_a: editChoiceA.trim(),
+        choice_b: editChoiceB.trim(),
+        choice_c: editChoiceC.trim(),
+        choice_d: editChoiceD.trim(),
+        correct_index: parsedCorrectIndex,
+        question_type: editQuestionType,
+        difficulty: editDifficulty.trim() || null,
+        is_active: editIsActive,
+        section: editSection.trim() || null,
+        source_id: editSourceId || null,
+        category_id: editCategoryId || null
+      })
+
+      setQuestionUpdateMessage('Question created successfully.')
+      setQuestionDrawerMode('')
+      resetQuestionEditForm()
+      if (debouncedQuestionSearch.length >= 2) {
+        const rows = await selectFrom('questions', {
+          columns: QUESTION_COLUMNS,
+          filters: {
+            question_text: `ilike.*${debouncedQuestionSearch}*`,
+            order: 'id.desc',
+            limit: '25'
+          }
+        })
+        setSearchResults(rows)
+      }
+      await refreshCategoryQuestions()
+      await loadQuestionMatrixQuestions()
+    } catch (err) {
+      setQuestionUpdateError(err instanceof Error ? err.message : 'Failed to create question.')
+    } finally {
+      setIsUpdatingQuestion(false)
+    }
+  }
+
   async function handleUpdateQuestion(event) {
     event.preventDefault()
     setQuestionUpdateMessage('')
@@ -891,6 +1019,7 @@ function AdminPage() {
       )
 
       setQuestionUpdateMessage('Question updated successfully.')
+      setQuestionDrawerMode('')
       if (debouncedQuestionSearch.length >= 2) {
         const rows = await selectFrom('questions', {
           columns: QUESTION_COLUMNS,
@@ -936,6 +1065,7 @@ function AdminPage() {
       })
 
       setSourceSubmitMessage('Source created successfully.')
+      setSourceDrawerMode('')
       setSourceShortTitle('')
       setSourceFullTitle('')
       setSourceFrontCoverImageUrl('')
@@ -990,6 +1120,7 @@ function AdminPage() {
       )
 
       setSourceUpdateMessage('Source updated successfully.')
+      setSourceDrawerMode('')
       await loadSources()
     } catch (err) {
       setSourceUpdateError(err instanceof Error ? err.message : 'Failed to update source.')
@@ -1238,6 +1369,13 @@ function AdminPage() {
       </details>
         <details id="admin-questions-list" className="admin-section admin-section-wide" open>
         <summary className="admin-section-summary">Questions List</summary>
+        <div className="admin-section-heading-row">
+          <div>
+            <h3>Questions</h3>
+            <p>Create a new question or edit an existing row without leaving the list.</p>
+          </div>
+          <button type="button" onClick={openNewQuestionDrawer}>New question</button>
+        </div>
         {listSourceIdFilter && filteredCategoryQuestions.length > 0 ? (
           <p className="admin-row-count">Rows: {filteredCategoryQuestions.length}</p>
         ) : null}
@@ -1351,7 +1489,7 @@ function AdminPage() {
                     <td>{categoryNamesById[question.category_id] || '—'}</td>
                     <td>{question.is_active ? 'Active' : 'Inactive'}</td>
                     <td>
-                      <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
+                      <button type="button" onClick={() => openEditQuestionDrawer(question)}>
                         Edit
                       </button>
                     </td>
@@ -1364,47 +1502,10 @@ function AdminPage() {
           )
         ) : null}
 
-        <h3 id="admin-question-editor">Question editor</h3>
-        {!editingQuestionId ? <p>Click Edit from search results to load a question.</p> : null}
-        <form onSubmit={handleUpdateQuestion}>
-          <label htmlFor="edit-question-text">Question text</label>
-          <textarea id="edit-question-text" name="question_text" value={editQuestionText} onChange={(event) => setEditQuestionText(event.target.value)} required />
-          <label htmlFor="edit-choice-a">Choice A</label>
-          <input id="edit-choice-a" name="choice_a" type="text" value={editChoiceA} onChange={(event) => setEditChoiceA(event.target.value)} required />
-          <label htmlFor="edit-choice-b">Choice B</label>
-          <input id="edit-choice-b" name="choice_b" type="text" value={editChoiceB} onChange={(event) => setEditChoiceB(event.target.value)} required />
-          <label htmlFor="edit-choice-c">Choice C</label>
-          <input id="edit-choice-c" name="choice_c" type="text" value={editChoiceC} onChange={(event) => setEditChoiceC(event.target.value)} required />
-          <label htmlFor="edit-choice-d">Choice D</label>
-          <input id="edit-choice-d" name="choice_d" type="text" value={editChoiceD} onChange={(event) => setEditChoiceD(event.target.value)} required />
-          <label htmlFor="edit-correct-index">Correct index</label>
-          <input id="edit-correct-index" name="correct_index" type="number" min={0} max={3} value={editCorrectIndex} onChange={(event) => setEditCorrectIndex(event.target.value)} required />
-          <label htmlFor="edit-difficulty">Difficulty</label>
-          <input id="edit-difficulty" name="difficulty" type="text" value={editDifficulty} onChange={(event) => setEditDifficulty(event.target.value)} />
-          <label htmlFor="edit-question-type">Question type</label>
-          <select id="edit-question-type" name="question_type" value={editQuestionType} onChange={(event) => setEditQuestionType(event.target.value)}>
-            <option value="mc_single">mc_single</option>
-          </select>
-          <label htmlFor="edit-category">Category</label>
-          <select id="edit-category" name="category_id" value={editCategoryId} onChange={(event) => setEditCategoryId(event.target.value)}>
-            <option value="">No category</option>
-            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-          </select>
-          <label htmlFor="edit-source">Source</label>
-          <select id="edit-source" name="source_id" value={editSourceId} onChange={(event) => setEditSourceId(event.target.value)}>
-            <option value="">No source</option>
-            {sources.map((source) => <option key={source.id} value={source.id}>{source.short_title}</option>)}
-          </select>
-          <label htmlFor="edit-section">Section</label>
-          <input id="edit-section" name="section" type="text" value={editSection} onChange={(event) => setEditSection(event.target.value)} />
-          <label htmlFor="edit-active">Is active</label>
-          <input id="edit-active" name="is_active" type="checkbox" checked={editIsActive} onChange={(event) => setEditIsActive(event.target.checked)} />
-          <button type="submit" disabled={!editingQuestionId || isUpdatingQuestion}>
-            {isUpdatingQuestion ? 'Saving...' : 'Save question changes'}
-          </button>
-        </form>
-        {questionUpdateMessage ? <p>{questionUpdateMessage}</p> : null}
-        {questionUpdateError ? <p>{questionUpdateError}</p> : null}
+        <div id="admin-question-editor" className="admin-editor-anchor">
+          {questionUpdateMessage ? <p>{questionUpdateMessage}</p> : null}
+          {questionUpdateError ? <p>{questionUpdateError}</p> : null}
+        </div>
 
         {listSourceIdFilter && !isLoadingQuestions && !questionsError ? (
           filteredCategoryQuestions.length > 0 ? (
@@ -1475,7 +1576,7 @@ function AdminPage() {
                     <td>{question.is_active ? 'Yes' : 'No'}</td>
                     <td>
                       <div className="admin-question-actions">
-                        <button type="button" onClick={() => loadQuestionIntoEditForm(question)}>
+                        <button type="button" onClick={() => openEditQuestionDrawer(question)}>
                           Edit
                         </button>
                         <button
@@ -1499,93 +1600,14 @@ function AdminPage() {
 
         <details id="admin-sources" className="admin-section">
         <summary className="admin-section-summary">Book Sources</summary>
-        <form onSubmit={handleCreateSource}>
-          <label htmlFor="source-short-title">Short title</label>
-          <input
-            id="source-short-title"
-            name="short_title"
-            type="text"
-            value={sourceShortTitle}
-            onChange={(event) => setSourceShortTitle(event.target.value)}
-            required
-          />
+        <div className="admin-section-heading-row">
+          <div>
+            <h3>Sources / Books</h3>
+            <p>Create or edit book/source metadata in the drawer.</p>
+          </div>
+          <button type="button" onClick={openNewSourceDrawer}>New book/source</button>
+        </div>
 
-          <label htmlFor="source-full-title">Full title</label>
-          <input
-            id="source-full-title"
-            name="full_title"
-            type="text"
-            value={sourceFullTitle}
-            onChange={(event) => setSourceFullTitle(event.target.value)}
-          />
-
-          <label htmlFor="source-author">Author</label>
-          <input
-            id="source-author"
-            name="author"
-            type="text"
-            value={sourceAuthor}
-            onChange={(event) => setSourceAuthor(event.target.value)}
-          />
-
-          <label htmlFor="source-display-order">Display order</label>
-          <input
-            id="source-display-order"
-            name="display_order"
-            type="number"
-            value={sourceDisplayOrder}
-            onChange={(event) => setSourceDisplayOrder(event.target.value)}
-            required
-          />
-
-          <label htmlFor="source-front-cover-image-url">Front cover image URL/path</label>
-          <input
-            id="source-front-cover-image-url"
-            name="front_cover_image_url"
-            type="text"
-            value={sourceFrontCoverImageUrl}
-            onChange={(event) => setSourceFrontCoverImageUrl(event.target.value)}
-          />
-
-          <label htmlFor="source-back-cover-image-url">Back cover image URL/path</label>
-          <input
-            id="source-back-cover-image-url"
-            name="back_cover_image_url"
-            type="text"
-            value={sourceBackCoverImageUrl}
-            onChange={(event) => setSourceBackCoverImageUrl(event.target.value)}
-          />
-
-          <label htmlFor="source-store-url">Store URL</label>
-          <input
-            id="source-store-url"
-            name="store_url"
-            type="url"
-            value={sourceStoreUrl}
-            onChange={(event) => setSourceStoreUrl(event.target.value)}
-          />
-
-          <label htmlFor="source-description">Description</label>
-          <textarea
-            id="source-description"
-            name="description"
-            value={sourceDescription}
-            onChange={(event) => setSourceDescription(event.target.value)}
-          />
-
-          <label htmlFor="source-active">Is active</label>
-          <input
-            id="source-active"
-            name="is_active"
-            type="checkbox"
-            checked={sourceIsActive}
-            onChange={(event) => setSourceIsActive(event.target.checked)}
-          />
-
-          <button type="submit" disabled={isSubmittingSource}>
-            {isSubmittingSource ? 'Creating...' : 'Create book source'}
-          </button>
-        </form>
 
         {sourceSubmitMessage ? <p>{sourceSubmitMessage}</p> : null}
         {sourceSubmitError ? <p>{sourceSubmitError}</p> : null}
@@ -1630,7 +1652,7 @@ function AdminPage() {
                       <td>{source.display_order ?? 0}</td>
                       <td>{source.is_active ? 'Yes' : 'No'}</td>
                       <td>
-                        <button type="button" onClick={() => loadSourceIntoEditForm(source)}>
+                        <button type="button" onClick={() => openEditSourceDrawer(source)}>
                           Edit
                         </button>
                       </td>
@@ -1644,131 +1666,18 @@ function AdminPage() {
           )
         ) : null}
 
-        <h4>Book Source Editor</h4>
-        {!editingSourceId ? <p>Click Edit on a source to load it into this form.</p> : null}
-        <form onSubmit={handleUpdateSource}>
-          <label htmlFor="edit-source-short-title">Short title</label>
-          <input
-            id="edit-source-short-title"
-            name="edit_short_title"
-            type="text"
-            value={editSourceShortTitle}
-            onChange={(event) => setEditSourceShortTitle(event.target.value)}
-            required
-          />
-
-          <label htmlFor="edit-source-full-title">Full title</label>
-          <input
-            id="edit-source-full-title"
-            name="edit_full_title"
-            type="text"
-            value={editSourceFullTitle}
-            onChange={(event) => setEditSourceFullTitle(event.target.value)}
-          />
-
-          <label htmlFor="edit-source-author">Author</label>
-          <input
-            id="edit-source-author"
-            name="edit_author"
-            type="text"
-            value={editSourceAuthor}
-            onChange={(event) => setEditSourceAuthor(event.target.value)}
-          />
-
-          <label htmlFor="edit-source-display-order">Display order</label>
-          <input
-            id="edit-source-display-order"
-            name="edit_display_order"
-            type="number"
-            value={editSourceDisplayOrder}
-            onChange={(event) => setEditSourceDisplayOrder(event.target.value)}
-            required
-          />
-
-          <label htmlFor="edit-source-front-cover-image-url">Front cover image URL/path</label>
-          <input
-            id="edit-source-front-cover-image-url"
-            name="edit_front_cover_image_url"
-            type="text"
-            value={editSourceFrontCoverImageUrl}
-            onChange={(event) => setEditSourceFrontCoverImageUrl(event.target.value)}
-          />
-
-          <label htmlFor="edit-source-back-cover-image-url">Back cover image URL/path</label>
-          <input
-            id="edit-source-back-cover-image-url"
-            name="edit_back_cover_image_url"
-            type="text"
-            value={editSourceBackCoverImageUrl}
-            onChange={(event) => setEditSourceBackCoverImageUrl(event.target.value)}
-          />
-
-          <label htmlFor="edit-source-store-url">Store URL</label>
-          <input
-            id="edit-source-store-url"
-            name="edit_store_url"
-            type="url"
-            value={editSourceStoreUrl}
-            onChange={(event) => setEditSourceStoreUrl(event.target.value)}
-          />
-
-          <label htmlFor="edit-source-description">Description</label>
-          <textarea
-            id="edit-source-description"
-            name="edit_description"
-            value={editSourceDescription}
-            onChange={(event) => setEditSourceDescription(event.target.value)}
-          />
-
-          <label htmlFor="edit-source-active">Is active</label>
-          <input
-            id="edit-source-active"
-            name="edit_is_active"
-            type="checkbox"
-            checked={editSourceIsActive}
-            onChange={(event) => setEditSourceIsActive(event.target.checked)}
-          />
-
-          <button type="submit" disabled={!editingSourceId || isUpdatingSource}>
-            {isUpdatingSource ? 'Saving...' : 'Save book source changes'}
-          </button>
-        </form>
       </details>
 
         <details id="admin-categories" className="admin-section">
         <summary className="admin-section-summary">Categories</summary>
-        <form onSubmit={handleCreateCategory}>
-          <label htmlFor="category-name">Name</label>
-          <input
-            id="category-name"
-            name="name"
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-          />
+        <div className="admin-section-heading-row">
+          <div>
+            <h3>Categories</h3>
+            <p>Create or edit category names, descriptions, and active status in the drawer.</p>
+          </div>
+          <button type="button" onClick={openNewCategoryDrawer}>New category</button>
+        </div>
 
-          <label htmlFor="category-description">Description</label>
-          <textarea
-            id="category-description"
-            name="description"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-
-          <label htmlFor="category-active">Is active</label>
-          <input
-            id="category-active"
-            name="is_active"
-            type="checkbox"
-            checked={isActive}
-            onChange={(event) => setIsActive(event.target.checked)}
-          />
-
-          <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating...' : 'Create category'}
-          </button>
-        </form>
 
         {submitMessage ? <p>{submitMessage}</p> : null}
         {submitError ? <p>{submitError}</p> : null}
@@ -1797,7 +1706,7 @@ function AdminPage() {
                       <td>{category.description || 'No description'}</td>
                       <td>{category.is_active ? 'Yes' : 'No'}</td>
                       <td>
-                        <button type="button" onClick={() => loadCategoryIntoEditForm(category)}>
+                        <button type="button" onClick={() => openEditCategoryDrawer(category)}>
                           Edit
                         </button>
                       </td>
@@ -1811,42 +1720,219 @@ function AdminPage() {
           )
         ) : null}
 
-        <h4>Category Editor</h4>
-        {!editingCategoryId ? <p>Click Edit on a category to load it into this form.</p> : null}
-        <form onSubmit={handleUpdateCategory}>
-          <label htmlFor="edit-category-name">Name</label>
-          <input
-            id="edit-category-name"
-            name="edit_category_name"
-            type="text"
-            value={editCategoryName}
-            onChange={(event) => setEditCategoryName(event.target.value)}
-            required
-          />
-
-          <label htmlFor="edit-category-description">Description</label>
-          <textarea
-            id="edit-category-description"
-            name="edit_category_description"
-            value={editCategoryDescription}
-            onChange={(event) => setEditCategoryDescription(event.target.value)}
-          />
-
-          <label htmlFor="edit-category-active">Is active</label>
-          <input
-            id="edit-category-active"
-            name="edit_category_is_active"
-            type="checkbox"
-            checked={editCategoryIsActive}
-            onChange={(event) => setEditCategoryIsActive(event.target.checked)}
-          />
-
-          <button type="submit" disabled={!editingCategoryId || isUpdatingCategory}>
-            {isUpdatingCategory ? 'Saving...' : 'Save category changes'}
-          </button>
-        </form>
         </details>
       </div>
+
+      {categoryDrawerMode ? (
+        <div className="admin-drawer-overlay" role="presentation">
+          <aside className="admin-drawer" role="dialog" aria-modal="true" aria-labelledby="admin-category-drawer-title">
+            <div className="admin-drawer-header">
+              <h3 id="admin-category-drawer-title">
+                {categoryDrawerMode === 'edit' ? 'Edit category' : 'New category'}
+              </h3>
+              <button type="button" className="admin-drawer-close" onClick={closeCategoryDrawer} aria-label="Close category drawer">
+                ×
+              </button>
+            </div>
+            <form
+              className="admin-drawer-form"
+              onSubmit={categoryDrawerMode === 'edit' ? handleUpdateCategory : handleCreateCategory}
+            >
+              {categoryDrawerMode === 'edit' && categoryUpdateError ? (
+                <p className="admin-drawer-message">{categoryUpdateError}</p>
+              ) : null}
+              {categoryDrawerMode === 'new' && submitError ? (
+                <p className="admin-drawer-message">{submitError}</p>
+              ) : null}
+              <label htmlFor={categoryDrawerMode === 'edit' ? 'edit-category-name' : 'category-name'}>Name</label>
+              <input
+                id={categoryDrawerMode === 'edit' ? 'edit-category-name' : 'category-name'}
+                name={categoryDrawerMode === 'edit' ? 'edit_category_name' : 'name'}
+                type="text"
+                value={categoryDrawerMode === 'edit' ? editCategoryName : name}
+                onChange={(event) =>
+                  categoryDrawerMode === 'edit'
+                    ? setEditCategoryName(event.target.value)
+                    : setName(event.target.value)
+                }
+                required
+              />
+
+              <label htmlFor={categoryDrawerMode === 'edit' ? 'edit-category-description' : 'category-description'}>Description</label>
+              <textarea
+                id={categoryDrawerMode === 'edit' ? 'edit-category-description' : 'category-description'}
+                name={categoryDrawerMode === 'edit' ? 'edit_category_description' : 'description'}
+                value={categoryDrawerMode === 'edit' ? editCategoryDescription : description}
+                onChange={(event) =>
+                  categoryDrawerMode === 'edit'
+                    ? setEditCategoryDescription(event.target.value)
+                    : setDescription(event.target.value)
+                }
+              />
+
+              <label htmlFor={categoryDrawerMode === 'edit' ? 'edit-category-active' : 'category-active'}>Is active</label>
+              <input
+                id={categoryDrawerMode === 'edit' ? 'edit-category-active' : 'category-active'}
+                name={categoryDrawerMode === 'edit' ? 'edit_category_is_active' : 'is_active'}
+                type="checkbox"
+                checked={categoryDrawerMode === 'edit' ? editCategoryIsActive : isActive}
+                onChange={(event) =>
+                  categoryDrawerMode === 'edit'
+                    ? setEditCategoryIsActive(event.target.checked)
+                    : setIsActive(event.target.checked)
+                }
+              />
+
+              <div className="admin-drawer-actions">
+                <button
+                  type="submit"
+                  disabled={categoryDrawerMode === 'edit' ? !editingCategoryId || isUpdatingCategory : isSubmitting}
+                >
+                  {categoryDrawerMode === 'edit'
+                    ? isUpdatingCategory
+                      ? 'Saving...'
+                      : 'Save'
+                    : isSubmitting
+                      ? 'Saving...'
+                      : 'Save'}
+                </button>
+                <button type="button" className="admin-secondary-button" onClick={closeCategoryDrawer}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </aside>
+        </div>
+      ) : null}
+
+      {sourceDrawerMode ? (
+        <div className="admin-drawer-overlay" role="presentation">
+          <aside className="admin-drawer" role="dialog" aria-modal="true" aria-labelledby="admin-source-drawer-title">
+            <div className="admin-drawer-header">
+              <h3 id="admin-source-drawer-title">
+                {sourceDrawerMode === 'edit' ? 'Edit book/source' : 'New book/source'}
+              </h3>
+              <button type="button" className="admin-drawer-close" onClick={closeSourceDrawer} aria-label="Close book/source drawer">
+                ×
+              </button>
+            </div>
+            <form
+              className="admin-drawer-form"
+              onSubmit={sourceDrawerMode === 'edit' ? handleUpdateSource : handleCreateSource}
+            >
+              {sourceDrawerMode === 'edit' && sourceUpdateError ? (
+                <p className="admin-drawer-message">{sourceUpdateError}</p>
+              ) : null}
+              {sourceDrawerMode === 'new' && sourceSubmitError ? (
+                <p className="admin-drawer-message">{sourceSubmitError}</p>
+              ) : null}
+              <label htmlFor={sourceDrawerMode === 'edit' ? 'edit-source-short-title' : 'source-short-title'}>Short title</label>
+              <input id={sourceDrawerMode === 'edit' ? 'edit-source-short-title' : 'source-short-title'} name={sourceDrawerMode === 'edit' ? 'edit_short_title' : 'short_title'} type="text" value={sourceDrawerMode === 'edit' ? editSourceShortTitle : sourceShortTitle} onChange={(event) => sourceDrawerMode === 'edit' ? setEditSourceShortTitle(event.target.value) : setSourceShortTitle(event.target.value)} required />
+
+              <label htmlFor={sourceDrawerMode === 'edit' ? 'edit-source-full-title' : 'source-full-title'}>Full title</label>
+              <input id={sourceDrawerMode === 'edit' ? 'edit-source-full-title' : 'source-full-title'} name={sourceDrawerMode === 'edit' ? 'edit_full_title' : 'full_title'} type="text" value={sourceDrawerMode === 'edit' ? editSourceFullTitle : sourceFullTitle} onChange={(event) => sourceDrawerMode === 'edit' ? setEditSourceFullTitle(event.target.value) : setSourceFullTitle(event.target.value)} />
+
+              <label htmlFor={sourceDrawerMode === 'edit' ? 'edit-source-author' : 'source-author'}>Author</label>
+              <input id={sourceDrawerMode === 'edit' ? 'edit-source-author' : 'source-author'} name={sourceDrawerMode === 'edit' ? 'edit_author' : 'author'} type="text" value={sourceDrawerMode === 'edit' ? editSourceAuthor : sourceAuthor} onChange={(event) => sourceDrawerMode === 'edit' ? setEditSourceAuthor(event.target.value) : setSourceAuthor(event.target.value)} />
+
+              <label htmlFor={sourceDrawerMode === 'edit' ? 'edit-source-display-order' : 'source-display-order'}>Display order</label>
+              <input id={sourceDrawerMode === 'edit' ? 'edit-source-display-order' : 'source-display-order'} name={sourceDrawerMode === 'edit' ? 'edit_display_order' : 'display_order'} type="number" value={sourceDrawerMode === 'edit' ? editSourceDisplayOrder : sourceDisplayOrder} onChange={(event) => sourceDrawerMode === 'edit' ? setEditSourceDisplayOrder(event.target.value) : setSourceDisplayOrder(event.target.value)} required />
+
+              <label htmlFor={sourceDrawerMode === 'edit' ? 'edit-source-front-cover-image-url' : 'source-front-cover-image-url'}>Front cover image URL/path</label>
+              <input id={sourceDrawerMode === 'edit' ? 'edit-source-front-cover-image-url' : 'source-front-cover-image-url'} name={sourceDrawerMode === 'edit' ? 'edit_front_cover_image_url' : 'front_cover_image_url'} type="text" value={sourceDrawerMode === 'edit' ? editSourceFrontCoverImageUrl : sourceFrontCoverImageUrl} onChange={(event) => sourceDrawerMode === 'edit' ? setEditSourceFrontCoverImageUrl(event.target.value) : setSourceFrontCoverImageUrl(event.target.value)} />
+
+              <label htmlFor={sourceDrawerMode === 'edit' ? 'edit-source-back-cover-image-url' : 'source-back-cover-image-url'}>Back cover image URL/path</label>
+              <input id={sourceDrawerMode === 'edit' ? 'edit-source-back-cover-image-url' : 'source-back-cover-image-url'} name={sourceDrawerMode === 'edit' ? 'edit_back_cover_image_url' : 'back_cover_image_url'} type="text" value={sourceDrawerMode === 'edit' ? editSourceBackCoverImageUrl : sourceBackCoverImageUrl} onChange={(event) => sourceDrawerMode === 'edit' ? setEditSourceBackCoverImageUrl(event.target.value) : setSourceBackCoverImageUrl(event.target.value)} />
+
+              <label htmlFor={sourceDrawerMode === 'edit' ? 'edit-source-store-url' : 'source-store-url'}>Store URL</label>
+              <input id={sourceDrawerMode === 'edit' ? 'edit-source-store-url' : 'source-store-url'} name={sourceDrawerMode === 'edit' ? 'edit_store_url' : 'store_url'} type="url" value={sourceDrawerMode === 'edit' ? editSourceStoreUrl : sourceStoreUrl} onChange={(event) => sourceDrawerMode === 'edit' ? setEditSourceStoreUrl(event.target.value) : setSourceStoreUrl(event.target.value)} />
+
+              <label htmlFor={sourceDrawerMode === 'edit' ? 'edit-source-description' : 'source-description'}>Description</label>
+              <textarea id={sourceDrawerMode === 'edit' ? 'edit-source-description' : 'source-description'} name={sourceDrawerMode === 'edit' ? 'edit_description' : 'description'} value={sourceDrawerMode === 'edit' ? editSourceDescription : sourceDescription} onChange={(event) => sourceDrawerMode === 'edit' ? setEditSourceDescription(event.target.value) : setSourceDescription(event.target.value)} />
+
+              <label htmlFor={sourceDrawerMode === 'edit' ? 'edit-source-active' : 'source-active'}>Is active</label>
+              <input id={sourceDrawerMode === 'edit' ? 'edit-source-active' : 'source-active'} name={sourceDrawerMode === 'edit' ? 'edit_is_active' : 'is_active'} type="checkbox" checked={sourceDrawerMode === 'edit' ? editSourceIsActive : sourceIsActive} onChange={(event) => sourceDrawerMode === 'edit' ? setEditSourceIsActive(event.target.checked) : setSourceIsActive(event.target.checked)} />
+
+              <div className="admin-drawer-actions">
+                <button type="submit" disabled={sourceDrawerMode === 'edit' ? !editingSourceId || isUpdatingSource : isSubmittingSource}>
+                  {sourceDrawerMode === 'edit'
+                    ? isUpdatingSource
+                      ? 'Saving...'
+                      : 'Save'
+                    : isSubmittingSource
+                      ? 'Saving...'
+                      : 'Save'}
+                </button>
+                <button type="button" className="admin-secondary-button" onClick={closeSourceDrawer}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </aside>
+        </div>
+      ) : null}
+
+      {questionDrawerMode ? (
+        <div className="admin-drawer-overlay" role="presentation">
+          <aside className="admin-drawer admin-drawer-wide" role="dialog" aria-modal="true" aria-labelledby="admin-question-drawer-title">
+            <div className="admin-drawer-header">
+              <h3 id="admin-question-drawer-title">
+                {questionDrawerMode === 'edit' ? 'Edit question' : 'New question'}
+              </h3>
+              <button type="button" className="admin-drawer-close" onClick={closeQuestionDrawer} aria-label="Close question drawer">
+                ×
+              </button>
+            </div>
+            <form
+              className="admin-drawer-form"
+              onSubmit={questionDrawerMode === 'edit' ? handleUpdateQuestion : handleCreateQuestion}
+            >
+              {questionUpdateError ? <p className="admin-drawer-message">{questionUpdateError}</p> : null}
+              <label htmlFor="edit-question-text">Question text</label>
+              <textarea id="edit-question-text" name="question_text" value={editQuestionText} onChange={(event) => setEditQuestionText(event.target.value)} required />
+              <label htmlFor="edit-choice-a">Choice A</label>
+              <input id="edit-choice-a" name="choice_a" type="text" value={editChoiceA} onChange={(event) => setEditChoiceA(event.target.value)} required />
+              <label htmlFor="edit-choice-b">Choice B</label>
+              <input id="edit-choice-b" name="choice_b" type="text" value={editChoiceB} onChange={(event) => setEditChoiceB(event.target.value)} required />
+              <label htmlFor="edit-choice-c">Choice C</label>
+              <input id="edit-choice-c" name="choice_c" type="text" value={editChoiceC} onChange={(event) => setEditChoiceC(event.target.value)} required />
+              <label htmlFor="edit-choice-d">Choice D</label>
+              <input id="edit-choice-d" name="choice_d" type="text" value={editChoiceD} onChange={(event) => setEditChoiceD(event.target.value)} required />
+              <label htmlFor="edit-correct-index">Correct index</label>
+              <input id="edit-correct-index" name="correct_index" type="number" min={0} max={3} value={editCorrectIndex} onChange={(event) => setEditCorrectIndex(event.target.value)} required />
+              <label htmlFor="edit-difficulty">Difficulty</label>
+              <input id="edit-difficulty" name="difficulty" type="text" value={editDifficulty} onChange={(event) => setEditDifficulty(event.target.value)} />
+              <label htmlFor="edit-question-type">Question type</label>
+              <select id="edit-question-type" name="question_type" value={editQuestionType} onChange={(event) => setEditQuestionType(event.target.value)}>
+                <option value="mc_single">mc_single</option>
+              </select>
+              <label htmlFor="edit-category">Category</label>
+              <select id="edit-category" name="category_id" value={editCategoryId} onChange={(event) => setEditCategoryId(event.target.value)}>
+                <option value="">No category</option>
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+              <label htmlFor="edit-source">Source</label>
+              <select id="edit-source" name="source_id" value={editSourceId} onChange={(event) => setEditSourceId(event.target.value)}>
+                <option value="">No source</option>
+                {sources.map((source) => <option key={source.id} value={source.id}>{source.short_title}</option>)}
+              </select>
+              <label htmlFor="edit-section">Section</label>
+              <input id="edit-section" name="section" type="text" value={editSection} onChange={(event) => setEditSection(event.target.value)} />
+              <label htmlFor="edit-active">Is active</label>
+              <input id="edit-active" name="is_active" type="checkbox" checked={editIsActive} onChange={(event) => setEditIsActive(event.target.checked)} />
+
+              <div className="admin-drawer-actions">
+                <button type="submit" disabled={questionDrawerMode === 'edit' ? !editingQuestionId || isUpdatingQuestion : isUpdatingQuestion}>
+                  {isUpdatingQuestion ? 'Saving...' : 'Save'}
+                </button>
+                <button type="button" className="admin-secondary-button" onClick={closeQuestionDrawer}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </aside>
+        </div>
+      ) : null}
     </section>
   )
 }
