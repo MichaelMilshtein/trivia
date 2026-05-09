@@ -89,6 +89,8 @@ const ADMIN_NAV_ITEMS = [
 function AdminPage() {
   const [authSession, setAuthSession] = useState(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [isSigningIn, setIsSigningIn] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
@@ -502,23 +504,26 @@ function AdminPage() {
     )
   }
 
-  async function handleGoogleSignIn() {
+  async function handleEmailPasswordSignIn(event) {
+    event.preventDefault()
     setLoginError('')
     setIsSigningIn(true)
 
     try {
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/admin`
-        }
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim(),
+        password: loginPassword
       })
 
-      if (oauthError) {
-        throw oauthError
+      if (signInError) {
+        throw signInError
       }
+
+      setAuthSession(data.session)
+      setLoginPassword('')
     } catch (err) {
-      setLoginError(err instanceof Error ? err.message : 'Unable to sign in with Google.')
+      setLoginError(err instanceof Error ? err.message : 'Unable to sign in with email and password.')
+    } finally {
       setIsSigningIn(false)
     }
   }
@@ -1330,15 +1335,35 @@ function AdminPage() {
         <div className="admin-auth-card">
           <p className="admin-kicker">Admin access</p>
           <h2>Sign in to continue</h2>
-          <p className="admin-auth-copy">Use Google to open Admin tools.</p>
-          <div className="admin-auth-form">
-            <button type="button" onClick={handleGoogleSignIn} disabled={isSigningIn}>
-              {isSigningIn ? 'Redirecting to Google…' : 'Sign in with Google'}
+          <p className="admin-auth-copy">Use your Admin email and password to open Admin tools.</p>
+          <form className="admin-auth-form" onSubmit={handleEmailPasswordSignIn}>
+            <label htmlFor="admin-login-email">Email</label>
+            <input
+              id="admin-login-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              value={loginEmail}
+              onChange={(event) => setLoginEmail(event.target.value)}
+              required
+            />
+            <label htmlFor="admin-login-password">Password</label>
+            <input
+              id="admin-login-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              value={loginPassword}
+              onChange={(event) => setLoginPassword(event.target.value)}
+              required
+            />
+            <button type="submit" disabled={isSigningIn}>
+              {isSigningIn ? 'Signing in…' : 'Sign in'}
             </button>
             <div className="admin-auth-message" role="alert" aria-live="polite">
               {loginError}
             </div>
-          </div>
+          </form>
         </div>
       </section>
     )

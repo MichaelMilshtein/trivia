@@ -79,7 +79,7 @@ function getAuthRedirectSessionParams() {
   const params = hashParams.has('access_token') ? hashParams : searchParams
 
   if (params.get('error') || params.get('error_description')) {
-    throw new Error(params.get('error_description') || params.get('error') || 'Unable to sign in with Google.')
+    throw new Error(params.get('error_description') || params.get('error') || 'Unable to complete sign-in.')
   }
 
   if (!params.has('access_token')) {
@@ -168,22 +168,13 @@ async function requestSupabaseAuthToken(body, grantType) {
   return session
 }
 
-async function signInWithOAuth({ provider, options = {} }) {
-  const { supabaseUrl: url } = getSupabaseConfig()
-  const redirectTo = options.redirectTo || (typeof window !== 'undefined' ? window.location.href : undefined)
-  const authorizeUrl = new URL(`${url}/auth/v1/authorize`)
-
-  authorizeUrl.searchParams.set('provider', provider)
-
-  if (redirectTo) {
-    authorizeUrl.searchParams.set('redirect_to', redirectTo)
+async function signInWithPassword({ email, password }) {
+  try {
+    const session = await requestSupabaseAuthToken({ email, password }, 'password')
+    return { data: { session, user: session.user }, error: null }
+  } catch (error) {
+    return { data: { session: null, user: null }, error }
   }
-
-  if (typeof window !== 'undefined') {
-    window.location.assign(authorizeUrl.toString())
-  }
-
-  return { data: { provider, url: authorizeUrl.toString() }, error: null }
 }
 
 async function getSession() {
@@ -193,7 +184,7 @@ async function getSession() {
 
 export const supabase = {
   auth: {
-    signInWithOAuth,
+    signInWithPassword,
     getSession,
     signOut
   }
