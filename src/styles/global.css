@@ -163,7 +163,8 @@ body {
 }
 
 .admin-sidebar-list a:hover,
-.admin-sidebar-list a:focus-visible {
+.admin-sidebar-list a:focus-visible,
+.admin-sidebar-list a.is-active {
   border-color: #bfdbfe;
   background: var(--admin-accent-soft);
   color: #1d4ed8;

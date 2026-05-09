@@ -71,13 +71,11 @@ const QUESTION_SORT_FIELDS = {
 }
 
 const ADMIN_NAV_ITEMS = [
-  { href: '#admin-overview', label: 'Dashboard / Overview' },
-  { href: '#admin-categories', label: 'Categories' },
-  { href: '#admin-sources', label: 'Sources / Books' },
-  { href: '#admin-question-import', label: 'Question Import' },
-  { href: '#admin-question-editor', label: 'Question Editor' },
-  { href: '#admin-questions-list', label: 'Questions List' },
-  { href: '#admin-question-matrix', label: 'Question Matrix' }
+  { id: 'admin-overview', href: '#admin-overview', label: 'Dashboard / Overview' },
+  { id: 'admin-sources', href: '#admin-sources', label: 'Book Sources' },
+  { id: 'admin-categories', href: '#admin-categories', label: 'Categories' },
+  { id: 'admin-question-import', href: '#admin-question-import', label: 'Question Import' },
+  { id: 'admin-questions-list', href: '#admin-questions-list', label: 'Question List' }
 ]
 
 function AdminPage() {
@@ -169,6 +167,7 @@ function AdminPage() {
   const [questionMatrixQuestions, setQuestionMatrixQuestions] = useState([])
   const [isLoadingQuestionMatrix, setIsLoadingQuestionMatrix] = useState(false)
   const [questionMatrixError, setQuestionMatrixError] = useState('')
+  const [openAdminSectionId, setOpenAdminSectionId] = useState('admin-overview')
 
   const sourceShortTitlesById = useMemo(
     () =>
@@ -1157,6 +1156,37 @@ function AdminPage() {
     }
   }
 
+  function handleAdminSectionToggle(event, sectionId) {
+    if (event.target !== event.currentTarget) {
+      return
+    }
+
+    if (event.currentTarget.open) {
+      setOpenAdminSectionId(sectionId)
+      return
+    }
+
+    setOpenAdminSectionId((currentSectionId) =>
+      currentSectionId === sectionId ? '' : currentSectionId
+    )
+  }
+
+  function handleAdminNavClick(event, sectionId) {
+    event.preventDefault()
+    setOpenAdminSectionId(sectionId)
+
+    window.requestAnimationFrame(() => {
+      const sectionElement = document.getElementById(sectionId)
+
+      if (!sectionElement) {
+        return
+      }
+
+      sectionElement.scrollIntoView({ block: 'start' })
+      sectionElement.focus({ preventScroll: true })
+    })
+  }
+
   return (
     <section className="admin-page">
       <aside className="admin-sidebar" aria-label="Admin section navigation">
@@ -1167,7 +1197,14 @@ function AdminPage() {
             <ul className="admin-sidebar-list">
               {ADMIN_NAV_ITEMS.map((item) => (
                 <li key={item.href}>
-                  <a href={item.href}>{item.label}</a>
+                  <a
+                    href={item.href}
+                    className={openAdminSectionId === item.id ? 'is-active' : undefined}
+                    aria-current={openAdminSectionId === item.id ? 'true' : undefined}
+                    onClick={(event) => handleAdminNavClick(event, item.id)}
+                  >
+                    {item.label}
+                  </a>
                 </li>
               ))}
             </ul>
@@ -1175,7 +1212,15 @@ function AdminPage() {
         </div>
       </aside>
       <div className="admin-content">
-        <section id="admin-overview" className="admin-hero admin-section" aria-labelledby="admin-overview-title">
+        <details
+          id="admin-overview"
+          className="admin-section"
+          open={openAdminSectionId === 'admin-overview'}
+          onToggle={(event) => handleAdminSectionToggle(event, 'admin-overview')}
+          tabIndex="-1"
+        >
+          <summary className="admin-section-summary">Dashboard / Overview</summary>
+          <div className="admin-hero admin-overview-panel" aria-labelledby="admin-overview-title">
           <div>
             <p className="admin-kicker">Content management</p>
             <h2 id="admin-overview-title">Dashboard / Overview</h2>
@@ -1199,9 +1244,220 @@ function AdminPage() {
               <strong>{questionMatrixQuestions.length}</strong>
             </div>
           </div>
-        </section>
+          </div>
 
-        <details id="admin-question-import" className="admin-section" open>
+        <details id="admin-question-matrix" className="admin-section admin-section-wide" open>
+        <summary className="admin-section-summary">Question Matrix — Active Questions</summary>
+        <p className="admin-row-count">
+          Counts include active questions only for active book sources. Columns follow source display order, then title.
+        </p>
+        {isLoadingQuestionMatrix ? <p>Loading question matrix...</p> : null}
+        {questionMatrixError ? <p>{questionMatrixError}</p> : null}
+        {!isLoadingQuestionMatrix && !questionMatrixError ? (
+          questionMatrix.activeSources.length > 0 ? (
+            questionMatrix.rows.length > 0 ? (
+              <div className="admin-matrix-scroll">
+                <table className="admin-simple-table admin-question-matrix-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Book Section</th>
+                      <th scope="col">Section Mapping</th>
+                      {questionMatrix.activeSources.map((source) => (
+                        <th key={source.id} scope="col">
+                          {source.short_title || 'Untitled source'}
+                        </th>
+                      ))}
+                      <th scope="col">Row total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {questionMatrix.rows.map((sectionRow) => (
+                      <tr key={sectionRow.key}>
+                        <th scope="row">{sectionRow.label}</th>
+                        <td>{sectionRow.sectionMapping}</td>
+                        {questionMatrix.activeSources.map((source) => {
+                          const matrixCellKey = `${source.id}::${sectionRow.key}`
+                          return (
+                            <td key={source.id} className="admin-matrix-number-cell">
+                              {questionMatrix.countsBySourceAndSection.get(matrixCellKey) || 0}
+                            </td>
+                          )
+                        })}
+                        <td className="admin-matrix-number-cell admin-matrix-total-cell">
+                          {sectionRow.total}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th scope="row">Column total</th>
+                      <td aria-label="Section mapping totals not applicable">—</td>
+                      {questionMatrix.activeSources.map((source) => (
+                        <td key={source.id} className="admin-matrix-number-cell admin-matrix-total-cell">
+                          {questionMatrix.columnTotalsBySource[String(source.id)] || 0}
+                        </td>
+                      ))}
+                      <td className="admin-matrix-number-cell admin-matrix-total-cell">
+                        {questionMatrix.grandTotal}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <p>No active questions found for active sources.</p>
+            )
+          ) : (
+            <p>No active book sources found.</p>
+          )
+        ) : null}
+      </details>
+        </details>
+
+        <details
+          id="admin-sources"
+          className="admin-section"
+          open={openAdminSectionId === 'admin-sources'}
+          onToggle={(event) => handleAdminSectionToggle(event, 'admin-sources')}
+          tabIndex="-1"
+        >
+        <summary className="admin-section-summary">Book Sources</summary>
+        <div className="admin-section-heading-row">
+          <div>
+            <h3>Sources / Books</h3>
+            <p>Create or edit book/source metadata in the drawer.</p>
+          </div>
+          <button type="button" onClick={openNewSourceDrawer}>New book/source</button>
+        </div>
+
+
+        {sourceSubmitMessage ? <p>{sourceSubmitMessage}</p> : null}
+        {sourceSubmitError ? <p>{sourceSubmitError}</p> : null}
+        {sourceUpdateMessage ? <p>{sourceUpdateMessage}</p> : null}
+        {sourceUpdateError ? <p>{sourceUpdateError}</p> : null}
+        {isLoading ? <p>Loading sources...</p> : null}
+        {!isLoading && !error ? (
+          sources.length > 0 ? (
+            <>
+              <p className="admin-row-count">Rows: {sources.length}</p>
+              <table className="admin-simple-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Short title</th>
+                    <th scope="col">Full title</th>
+                    <th scope="col">Author</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Metadata</th>
+                    <th scope="col">Display order</th>
+                    <th scope="col">Active</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sources.map((source) => (
+                    <tr key={source.id}>
+                      <td>{source.short_title}</td>
+                      <td>{source.full_title || 'N/A'}</td>
+                      <td>{source.author || 'N/A'}</td>
+                      <td title={source.description || ''}>
+                        {getSourceDescriptionPreview(source.description)}
+                      </td>
+                      <td>
+                        <div className="admin-source-meta-list">
+                          {renderSourceCoverThumbnail(source.front_cover_image_url, 'Front cover')}
+                          {renderSourceCoverThumbnail(source.back_cover_image_url, 'Back cover')}
+                          {renderSourceLink(source.front_cover_image_url, 'Front cover')}
+                          {renderSourceLink(source.back_cover_image_url, 'Back cover')}
+                          {renderSourceLink(source.store_url, 'Store')}
+                        </div>
+                      </td>
+                      <td>{source.display_order ?? 0}</td>
+                      <td>{source.is_active ? 'Yes' : 'No'}</td>
+                      <td>
+                        <button type="button" onClick={() => openEditSourceDrawer(source)}>
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <p>No sources found.</p>
+          )
+        ) : null}
+
+      </details>
+
+        <details
+          id="admin-categories"
+          className="admin-section"
+          open={openAdminSectionId === 'admin-categories'}
+          onToggle={(event) => handleAdminSectionToggle(event, 'admin-categories')}
+          tabIndex="-1"
+        >
+        <summary className="admin-section-summary">Categories</summary>
+        <div className="admin-section-heading-row">
+          <div>
+            <h3>Categories</h3>
+            <p>Create or edit category names, descriptions, and active status in the drawer.</p>
+          </div>
+          <button type="button" onClick={openNewCategoryDrawer}>New category</button>
+        </div>
+
+
+        {submitMessage ? <p>{submitMessage}</p> : null}
+        {submitError ? <p>{submitError}</p> : null}
+        {categoryUpdateMessage ? <p>{categoryUpdateMessage}</p> : null}
+        {categoryUpdateError ? <p>{categoryUpdateError}</p> : null}
+        {isLoading ? <p>Loading categories...</p> : null}
+        {error ? <p>{error}</p> : null}
+
+        {!isLoading && !error ? (
+          categories.length > 0 ? (
+            <>
+              <p className="admin-row-count">Rows: {categories.length}</p>
+              <table className="admin-simple-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Active</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categories.map((category) => (
+                    <tr key={category.id}>
+                      <td>{category.name}</td>
+                      <td>{category.description || 'No description'}</td>
+                      <td>{category.is_active ? 'Yes' : 'No'}</td>
+                      <td>
+                        <button type="button" onClick={() => openEditCategoryDrawer(category)}>
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <p>No categories found.</p>
+          )
+        ) : null}
+
+        </details>
+
+        <details
+          id="admin-question-import"
+          className="admin-section"
+          open={openAdminSectionId === 'admin-question-import'}
+          onToggle={(event) => handleAdminSectionToggle(event, 'admin-question-import')}
+          tabIndex="-1"
+        >
         <summary className="admin-section-summary">Question Import</summary>
         <details className="admin-helper-note">
           <summary>JSON import rules</summary>
@@ -1300,75 +1556,14 @@ function AdminPage() {
       </details>
 
 
-        <details id="admin-question-matrix" className="admin-section admin-section-wide" open>
-        <summary className="admin-section-summary">Question Matrix — Active Questions</summary>
-        <p className="admin-row-count">
-          Counts include active questions only for active book sources. Columns follow source display order, then title.
-        </p>
-        {isLoadingQuestionMatrix ? <p>Loading question matrix...</p> : null}
-        {questionMatrixError ? <p>{questionMatrixError}</p> : null}
-        {!isLoadingQuestionMatrix && !questionMatrixError ? (
-          questionMatrix.activeSources.length > 0 ? (
-            questionMatrix.rows.length > 0 ? (
-              <div className="admin-matrix-scroll">
-                <table className="admin-simple-table admin-question-matrix-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Book Section</th>
-                      <th scope="col">Section Mapping</th>
-                      {questionMatrix.activeSources.map((source) => (
-                        <th key={source.id} scope="col">
-                          {source.short_title || 'Untitled source'}
-                        </th>
-                      ))}
-                      <th scope="col">Row total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {questionMatrix.rows.map((sectionRow) => (
-                      <tr key={sectionRow.key}>
-                        <th scope="row">{sectionRow.label}</th>
-                        <td>{sectionRow.sectionMapping}</td>
-                        {questionMatrix.activeSources.map((source) => {
-                          const matrixCellKey = `${source.id}::${sectionRow.key}`
-                          return (
-                            <td key={source.id} className="admin-matrix-number-cell">
-                              {questionMatrix.countsBySourceAndSection.get(matrixCellKey) || 0}
-                            </td>
-                          )
-                        })}
-                        <td className="admin-matrix-number-cell admin-matrix-total-cell">
-                          {sectionRow.total}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <th scope="row">Column total</th>
-                      <td aria-label="Section mapping totals not applicable">—</td>
-                      {questionMatrix.activeSources.map((source) => (
-                        <td key={source.id} className="admin-matrix-number-cell admin-matrix-total-cell">
-                          {questionMatrix.columnTotalsBySource[String(source.id)] || 0}
-                        </td>
-                      ))}
-                      <td className="admin-matrix-number-cell admin-matrix-total-cell">
-                        {questionMatrix.grandTotal}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            ) : (
-              <p>No active questions found for active sources.</p>
-            )
-          ) : (
-            <p>No active book sources found.</p>
-          )
-        ) : null}
-      </details>
-        <details id="admin-questions-list" className="admin-section admin-section-wide" open>
-        <summary className="admin-section-summary">Questions List</summary>
+        <details
+          id="admin-questions-list"
+          className="admin-section admin-section-wide"
+          open={openAdminSectionId === 'admin-questions-list'}
+          onToggle={(event) => handleAdminSectionToggle(event, 'admin-questions-list')}
+          tabIndex="-1"
+        >
+        <summary className="admin-section-summary">Question List</summary>
         <div className="admin-section-heading-row">
           <div>
             <h3>Questions</h3>
@@ -1598,129 +1793,6 @@ function AdminPage() {
         ) : null}
       </details>
 
-        <details id="admin-sources" className="admin-section">
-        <summary className="admin-section-summary">Book Sources</summary>
-        <div className="admin-section-heading-row">
-          <div>
-            <h3>Sources / Books</h3>
-            <p>Create or edit book/source metadata in the drawer.</p>
-          </div>
-          <button type="button" onClick={openNewSourceDrawer}>New book/source</button>
-        </div>
-
-
-        {sourceSubmitMessage ? <p>{sourceSubmitMessage}</p> : null}
-        {sourceSubmitError ? <p>{sourceSubmitError}</p> : null}
-        {sourceUpdateMessage ? <p>{sourceUpdateMessage}</p> : null}
-        {sourceUpdateError ? <p>{sourceUpdateError}</p> : null}
-        {isLoading ? <p>Loading sources...</p> : null}
-        {!isLoading && !error ? (
-          sources.length > 0 ? (
-            <>
-              <p className="admin-row-count">Rows: {sources.length}</p>
-              <table className="admin-simple-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Short title</th>
-                    <th scope="col">Full title</th>
-                    <th scope="col">Author</th>
-                    <th scope="col">Description</th>
-                    <th scope="col">Metadata</th>
-                    <th scope="col">Display order</th>
-                    <th scope="col">Active</th>
-                    <th scope="col">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sources.map((source) => (
-                    <tr key={source.id}>
-                      <td>{source.short_title}</td>
-                      <td>{source.full_title || 'N/A'}</td>
-                      <td>{source.author || 'N/A'}</td>
-                      <td title={source.description || ''}>
-                        {getSourceDescriptionPreview(source.description)}
-                      </td>
-                      <td>
-                        <div className="admin-source-meta-list">
-                          {renderSourceCoverThumbnail(source.front_cover_image_url, 'Front cover')}
-                          {renderSourceCoverThumbnail(source.back_cover_image_url, 'Back cover')}
-                          {renderSourceLink(source.front_cover_image_url, 'Front cover')}
-                          {renderSourceLink(source.back_cover_image_url, 'Back cover')}
-                          {renderSourceLink(source.store_url, 'Store')}
-                        </div>
-                      </td>
-                      <td>{source.display_order ?? 0}</td>
-                      <td>{source.is_active ? 'Yes' : 'No'}</td>
-                      <td>
-                        <button type="button" onClick={() => openEditSourceDrawer(source)}>
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          ) : (
-            <p>No sources found.</p>
-          )
-        ) : null}
-
-      </details>
-
-        <details id="admin-categories" className="admin-section">
-        <summary className="admin-section-summary">Categories</summary>
-        <div className="admin-section-heading-row">
-          <div>
-            <h3>Categories</h3>
-            <p>Create or edit category names, descriptions, and active status in the drawer.</p>
-          </div>
-          <button type="button" onClick={openNewCategoryDrawer}>New category</button>
-        </div>
-
-
-        {submitMessage ? <p>{submitMessage}</p> : null}
-        {submitError ? <p>{submitError}</p> : null}
-        {categoryUpdateMessage ? <p>{categoryUpdateMessage}</p> : null}
-        {categoryUpdateError ? <p>{categoryUpdateError}</p> : null}
-        {isLoading ? <p>Loading categories...</p> : null}
-        {error ? <p>{error}</p> : null}
-
-        {!isLoading && !error ? (
-          categories.length > 0 ? (
-            <>
-              <p className="admin-row-count">Rows: {categories.length}</p>
-              <table className="admin-simple-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Name</th>
-                    <th scope="col">Description</th>
-                    <th scope="col">Active</th>
-                    <th scope="col">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categories.map((category) => (
-                    <tr key={category.id}>
-                      <td>{category.name}</td>
-                      <td>{category.description || 'No description'}</td>
-                      <td>{category.is_active ? 'Yes' : 'No'}</td>
-                      <td>
-                        <button type="button" onClick={() => openEditCategoryDrawer(category)}>
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          ) : (
-            <p>No categories found.</p>
-          )
-        ) : null}
-
-        </details>
       </div>
 
       {categoryDrawerMode ? (
