@@ -55,10 +55,36 @@ function getAuthSessionWithExpiry(authResponse) {
 function getSupabaseErrorMessage(errorBody, fallbackMessage) {
   try {
     const parsedError = JSON.parse(errorBody)
-    return parsedError.error_description || parsedError.msg || parsedError.message || fallbackMessage
+    const message = parsedError.error_description || parsedError.msg || parsedError.message
+    const detail = parsedError.details || parsedError.hint
+
+    if (message && detail) {
+      return `${message} ${detail}`
+    }
+
+    return message || detail || fallbackMessage
   } catch {
     return errorBody || fallbackMessage
   }
+}
+
+async function getSupabaseRestHeaders(extraHeaders = {}) {
+  const { supabasePublishableKey: key } = getSupabaseConfig()
+  const session = await getCurrentAuthSession()
+  const bearerToken = session?.access_token || key
+
+  return {
+    apikey: key,
+    Authorization: `Bearer ${bearerToken}`,
+    'Content-Type': 'application/json',
+    ...extraHeaders
+  }
+}
+
+async function throwSupabaseRestError(response, fallbackMessage) {
+  const errorBody = await response.text()
+  const errorMessage = getSupabaseErrorMessage(errorBody, fallbackMessage)
+  throw new Error(`Supabase request failed (${response.status}): ${errorMessage}`)
 }
 
 function getSupabaseConfig() {
@@ -249,7 +275,7 @@ export async function signOut() {
 }
 
 export async function selectFrom(table, { columns = '*', filters = {} } = {}) {
-  const { supabaseUrl: url, supabasePublishableKey: key } = getSupabaseConfig()
+  const { supabaseUrl: url } = getSupabaseConfig()
 
   const queryParams = new URLSearchParams({ select: columns })
 
@@ -258,45 +284,42 @@ export async function selectFrom(table, { columns = '*', filters = {} } = {}) {
   }
 
   const response = await fetch(`${url}/rest/v1/${table}?${queryParams.toString()}`, {
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json'
-    }
+    headers: await getSupabaseRestHeaders()
   })
 
   if (!response.ok) {
-    const errorBody = await response.text()
-    throw new Error(`Supabase request failed (${response.status}): ${errorBody}`)
+    await throwSupabaseRestError(response, 'Unable to load Supabase rows.')
   }
 
   return response.json()
 }
 
 export async function insertInto(table, values) {
-  const { supabaseUrl: url, supabasePublishableKey: key } = getSupabaseConfig()
+  const { supabaseUrl: url } = getSupabaseConfig()
 
   const response = await fetch(`${url}/rest/v1/${table}`, {
     method: 'POST',
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
+    headers: await getSupabaseRestHeaders({
       Prefer: 'return=representation'
-    },
+    }),
     body: JSON.stringify(values)
   })
 
   if (!response.ok) {
-    const errorBody = await response.text()
-    throw new Error(`Supabase request failed (${response.status}): ${errorBody}`)
+    await throwSupabaseRestError(response, 'Unable to insert Supabase rows.')
   }
 
-  return response.json()
+  const rows = await response.json()
+
+  if (Array.isArray(rows) && rows.length === 0) {
+    throw new Error('Supabase request did not insert any rows. Check your Admin sign-in and RLS policies.')
+  }
+
+  return rows
 }
 
 export async function updateRows(table, values, filters = {}) {
-  const { supabaseUrl: url, supabasePublishableKey: key } = getSupabaseConfig()
+  const { supabaseUrl: url } = getSupabaseConfig()
 
   const queryParams = new URLSearchParams()
 
@@ -306,19 +329,21 @@ export async function updateRows(table, values, filters = {}) {
 
   const response = await fetch(`${url}/rest/v1/${table}?${queryParams.toString()}`, {
     method: 'PATCH',
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
+    headers: await getSupabaseRestHeaders({
       Prefer: 'return=representation'
-    },
+    }),
     body: JSON.stringify(values)
   })
 
   if (!response.ok) {
-    const errorBody = await response.text()
-    throw new Error(`Supabase request failed (${response.status}): ${errorBody}`)
+    await throwSupabaseRestError(response, 'Unable to update Supabase rows.')
   }
 
-  return response.json()
+  const rows = await response.json()
+
+  if (Array.isArray(rows) && rows.length === 0) {
+    throw new Error('Supabase request did not update any rows. Check your Admin sign-in and RLS policies.')
+  }
+
+  return rows
 }
