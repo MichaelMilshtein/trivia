@@ -2579,6 +2579,13 @@ body {
   color: var(--admin-muted);
 }
 
+.admin-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .admin-editor-anchor p {
   margin: 0 0 0.75rem;
 }

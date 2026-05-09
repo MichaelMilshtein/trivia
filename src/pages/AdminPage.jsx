@@ -19,7 +19,7 @@ const QUESTION_MATRIX_SECTION_ORDER = [
   'Bonus Pages'
 ]
 const UNSECTIONED_QUESTION_LABEL = 'Unsectioned'
-const QUESTION_MATRIX_PAGE_SIZE = 1000
+const QUESTION_FETCH_PAGE_SIZE = 1000
 const QUESTION_MATRIX_SECTION_MAPPINGS = {
   'world events': 'World Events & Economy',
   'globalization & economy': 'World Events & Economy',
@@ -132,10 +132,6 @@ function AdminPage() {
   const [categoryQuestions, setCategoryQuestions] = useState([])
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   const [questionsError, setQuestionsError] = useState('')
-  const [listCategoryId, setListCategoryId] = useState('')
-  const [listSourceIdFilter, setListSourceIdFilter] = useState('')
-  const [listActiveFilter, setListActiveFilter] = useState('all')
-  const [listQuestionTypeFilter, setListQuestionTypeFilter] = useState('all')
   const [questionColumnFilters, setQuestionColumnFilters] = useState({
     question: '',
     source: '',
@@ -167,11 +163,6 @@ function AdminPage() {
   const [questionActiveError, setQuestionActiveError] = useState('')
   const [questionSortField, setQuestionSortField] = useState(QUESTION_SORT_FIELDS.source)
   const [questionSortDirection, setQuestionSortDirection] = useState('asc')
-  const [questionSearchInput, setQuestionSearchInput] = useState('')
-  const [debouncedQuestionSearch, setDebouncedQuestionSearch] = useState('')
-  const [searchResults, setSearchResults] = useState([])
-  const [isSearchingQuestions, setIsSearchingQuestions] = useState(false)
-  const [searchQuestionsError, setSearchQuestionsError] = useState('')
   const [questionMatrixQuestions, setQuestionMatrixQuestions] = useState([])
   const [isLoadingQuestionMatrix, setIsLoadingQuestionMatrix] = useState(false)
   const [questionMatrixError, setQuestionMatrixError] = useState('')
@@ -335,19 +326,6 @@ function AdminPage() {
       const difficulty = question.difficulty || 'unknown'
       const isActive = Boolean(question.is_active)
 
-      const sourceMatches = listSourceIdFilter ? sourceId === listSourceIdFilter : true
-      const categoryMatches = listCategoryId ? categoryId === listCategoryId : true
-
-      const activeMatches =
-        listActiveFilter === 'all'
-          ? true
-          : listActiveFilter === 'active'
-            ? isActive
-            : !isActive
-
-      const questionTypeMatches =
-        listQuestionTypeFilter === 'all' ? true : questionType === listQuestionTypeFilter
-
       const questionColumnMatches = normalizedQuestionFilter
         ? (question.question_text || '').toLowerCase().includes(normalizedQuestionFilter)
         : true
@@ -380,10 +358,6 @@ function AdminPage() {
             : !isActive
 
       return (
-        sourceMatches &&
-        categoryMatches &&
-        activeMatches &&
-        questionTypeMatches &&
         questionColumnMatches &&
         sourceColumnMatches &&
         sectionColumnMatches &&
@@ -434,10 +408,6 @@ function AdminPage() {
     })
   }, [
     categoryQuestions,
-    listSourceIdFilter,
-    listCategoryId,
-    listActiveFilter,
-    listQuestionTypeFilter,
     questionColumnFilters,
     sourceShortTitlesById,
     categoryNamesById,
@@ -548,14 +518,14 @@ function AdminPage() {
           filters: {
             is_active: 'eq.true',
             order: 'id.asc',
-            limit: String(QUESTION_MATRIX_PAGE_SIZE),
+            limit: String(QUESTION_FETCH_PAGE_SIZE),
             offset: String(offset)
           }
         })
 
         activeQuestionRows.push(...questionPage)
-        hasMoreQuestions = questionPage.length === QUESTION_MATRIX_PAGE_SIZE
-        offset += QUESTION_MATRIX_PAGE_SIZE
+        hasMoreQuestions = questionPage.length === QUESTION_FETCH_PAGE_SIZE
+        offset += QUESTION_FETCH_PAGE_SIZE
       }
 
       setQuestionMatrixQuestions(activeQuestionRows)
@@ -568,27 +538,31 @@ function AdminPage() {
     }
   }
 
-  async function fetchCategoryQuestions(sourceId = '', categoryId = '') {
-    const filters = {
-      order: 'id.desc'
+  async function fetchCategoryQuestions() {
+    const questionRows = []
+    let offset = 0
+    let hasMoreQuestions = true
+
+    while (hasMoreQuestions) {
+      const questionPage = await selectFrom('questions', {
+        columns: QUESTION_COLUMNS,
+        filters: {
+          order: 'id.desc',
+          limit: String(QUESTION_FETCH_PAGE_SIZE),
+          offset: String(offset)
+        }
+      })
+
+      questionRows.push(...questionPage)
+      hasMoreQuestions = questionPage.length === QUESTION_FETCH_PAGE_SIZE
+      offset += QUESTION_FETCH_PAGE_SIZE
     }
 
-    if (sourceId) {
-      filters.source_id = `eq.${sourceId}`
-    }
-
-    if (categoryId) {
-      filters.category_id = `eq.${categoryId}`
-    }
-
-    return selectFrom('questions', {
-      columns: QUESTION_COLUMNS,
-      filters
-    })
+    return questionRows
   }
 
-  async function refreshCategoryQuestions(sourceId = '', categoryId = '') {
-    const rows = await fetchCategoryQuestions(sourceId, categoryId)
+  async function refreshCategoryQuestions() {
+    const rows = await fetchCategoryQuestions()
     setCategoryQuestions(rows)
   }
 
@@ -699,8 +673,8 @@ function AdminPage() {
 
   function openNewQuestionDrawer() {
     resetQuestionEditForm()
-    setEditSourceId(listSourceIdFilter || selectedSourceId || '')
-    setEditCategoryId(listCategoryId || selectedCategoryId || '')
+    setEditSourceId(selectedSourceId || '')
+    setEditCategoryId(selectedCategoryId || '')
     setQuestionUpdateMessage('')
     setQuestionUpdateError('')
     setQuestionDrawerMode('new')
@@ -723,14 +697,6 @@ function AdminPage() {
   }
 
   function resetQuestionListFilters() {
-    setListSourceIdFilter('')
-    setListCategoryId('')
-    setListActiveFilter('all')
-    setListQuestionTypeFilter('all')
-    setQuestionSearchInput('')
-    setDebouncedQuestionSearch('')
-    setSearchResults([])
-    setSearchQuestionsError('')
     setQuestionColumnFilters({
       question: '',
       source: '',
@@ -741,45 +707,6 @@ function AdminPage() {
       active: 'all'
     })
   }
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setDebouncedQuestionSearch(questionSearchInput.trim())
-    }, 300)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [questionSearchInput])
-
-  useEffect(() => {
-    async function searchQuestions() {
-      if (debouncedQuestionSearch.length < 2) {
-        setSearchResults([])
-        setSearchQuestionsError('')
-        return
-      }
-
-      setIsSearchingQuestions(true)
-      setSearchQuestionsError('')
-
-      try {
-        const rows = await selectFrom('questions', {
-          columns: QUESTION_COLUMNS,
-          filters: {
-            question_text: `ilike.*${debouncedQuestionSearch}*`,
-            order: 'id.desc',
-            limit: '25'
-          }
-        })
-        setSearchResults(rows)
-      } catch (err) {
-        setSearchQuestionsError(err instanceof Error ? err.message : 'Failed to search questions.')
-      } finally {
-        setIsSearchingQuestions(false)
-      }
-    }
-
-    searchQuestions()
-  }, [debouncedQuestionSearch])
 
   useEffect(() => {
     async function initializeCategories() {
@@ -805,7 +732,7 @@ function AdminPage() {
       setQuestionsError('')
 
       try {
-        const rows = await fetchCategoryQuestions(listSourceIdFilter, listCategoryId)
+        const rows = await fetchCategoryQuestions()
         setCategoryQuestions(rows)
       } catch (err) {
         setQuestionsError(err instanceof Error ? err.message : 'Failed to load questions.')
@@ -815,7 +742,7 @@ function AdminPage() {
     }
 
     loadQuestionsForCategory()
-  }, [listSourceIdFilter, listCategoryId])
+  }, [])
 
   useEffect(() => {
     if (!categoryDrawerMode && !sourceDrawerMode && !questionDrawerMode) {
@@ -1069,17 +996,6 @@ function AdminPage() {
       setQuestionUpdateMessage('Question created successfully.')
       setQuestionDrawerMode('')
       resetQuestionEditForm()
-      if (debouncedQuestionSearch.length >= 2) {
-        const rows = await selectFrom('questions', {
-          columns: QUESTION_COLUMNS,
-          filters: {
-            question_text: `ilike.*${debouncedQuestionSearch}*`,
-            order: 'id.desc',
-            limit: '25'
-          }
-        })
-        setSearchResults(rows)
-      }
       await refreshCategoryQuestions()
       await loadQuestionMatrixQuestions()
     } catch (err) {
@@ -1135,17 +1051,6 @@ function AdminPage() {
 
       setQuestionUpdateMessage('Question updated successfully.')
       setQuestionDrawerMode('')
-      if (debouncedQuestionSearch.length >= 2) {
-        const rows = await selectFrom('questions', {
-          columns: QUESTION_COLUMNS,
-          filters: {
-            question_text: `ilike.*${debouncedQuestionSearch}*`,
-            order: 'id.desc',
-            limit: '25'
-          }
-        })
-        setSearchResults(rows)
-      }
       await refreshCategoryQuestions()
       await loadQuestionMatrixQuestions()
     } catch (err) {
@@ -1703,131 +1608,23 @@ function AdminPage() {
             <h3>Questions</h3>
             <p>Create a new question or edit an existing row without leaving the list.</p>
           </div>
-          <button type="button" onClick={openNewQuestionDrawer}>New question</button>
+          <div className="admin-heading-actions">
+            <button type="button" className="admin-secondary-button" onClick={resetQuestionListFilters}>
+              Reset filters
+            </button>
+            <button type="button" onClick={openNewQuestionDrawer}>New question</button>
+          </div>
         </div>
-        {filteredCategoryQuestions.length > 0 ? (
-          <p className="admin-row-count">Rows: {filteredCategoryQuestions.length}</p>
+        {!isLoadingQuestions && !questionsError ? (
+          <p className="admin-row-count">
+            Rows: {filteredCategoryQuestions.length} of {categoryQuestions.length} loaded
+          </p>
         ) : null}
-        <div className="admin-filters">
-          <label htmlFor="list-source-filter">Source</label>
-          <select
-            id="list-source-filter"
-            name="list_source_filter"
-            value={listSourceIdFilter}
-            onChange={(event) => setListSourceIdFilter(event.target.value)}
-          >
-            <option value="">All sources</option>
-            {sources.map((source) => (
-              <option key={source.id} value={source.id}>
-                {source.short_title}
-              </option>
-            ))}
-          </select>
-
-          <label htmlFor="list-category-filter">Category</label>
-          <select
-            id="list-category-filter"
-            name="list_category_filter"
-            value={listCategoryId}
-            onChange={(event) => setListCategoryId(event.target.value)}
-          >
-            <option value="">All categories</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-
-          <label htmlFor="list-active-filter">Active status</label>
-          <select
-            id="list-active-filter"
-            name="list_active_filter"
-            value={listActiveFilter}
-            onChange={(event) => setListActiveFilter(event.target.value)}
-          >
-            <option value="all">All</option>
-            <option value="active">Active only</option>
-            <option value="inactive">Inactive only</option>
-          </select>
-
-
-          <label htmlFor="list-question-type-filter">Question type</label>
-          <select
-            id="list-question-type-filter"
-            name="list_question_type_filter"
-            value={listQuestionTypeFilter}
-            onChange={(event) => setListQuestionTypeFilter(event.target.value)}
-          >
-            <option value="all">All</option>
-            {questionTypeOptions.map((questionType) => (
-              <option key={questionType} value={questionType}>
-                {questionType}
-              </option>
-            ))}
-          </select>
-
-          <span className="admin-filter-action-spacer" aria-hidden="true" />
-          <button type="button" className="admin-secondary-button" onClick={resetQuestionListFilters}>
-            Reset filters
-          </button>
-        </div>
 
         {isLoadingQuestions ? <p>Loading questions...</p> : null}
         {questionsError ? <p>{questionsError}</p> : null}
         {questionActiveMessage ? <p>{questionActiveMessage}</p> : null}
         {questionActiveError ? <p>{questionActiveError}</p> : null}
-
-        <div className="admin-inline-grid">
-          <label htmlFor="find-question-search">Find question</label>
-          <input
-            id="find-question-search"
-            name="find_question_search"
-            type="text"
-            value={questionSearchInput}
-            onChange={(event) => setQuestionSearchInput(event.target.value)}
-            placeholder="Type at least 2 characters"
-          />
-        </div>
-        {questionSearchInput.trim().length < 2 ? <p>Type at least 2 characters to search.</p> : null}
-        {isSearchingQuestions ? <p>Searching questions...</p> : null}
-        {searchQuestionsError ? <p>{searchQuestionsError}</p> : null}
-        {questionSearchInput.trim().length >= 2 && !isSearchingQuestions && !searchQuestionsError ? (
-          searchResults.length > 0 ? (
-            <table className="admin-question-table">
-              <thead>
-                <tr>
-                  <th scope="col">Question</th>
-                  <th scope="col">Source</th>
-                  <th scope="col">Section</th>
-                  <th scope="col">Category</th>
-                  <th scope="col">Active</th>
-                  <th scope="col">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {searchResults.map((question) => (
-                  <tr key={`search-${question.id}`}>
-                    <td title={question.question_text || ''} className="admin-question-cell-preview">
-                      {getQuestionPreview(question.question_text) || '—'}
-                    </td>
-                    <td>{sourceShortTitlesById[question.source_id] || '—'}</td>
-                    <td>{question.section || '—'}</td>
-                    <td>{categoryNamesById[question.category_id] || '—'}</td>
-                    <td>{question.is_active ? 'Active' : 'Inactive'}</td>
-                    <td>
-                      <button type="button" onClick={() => openEditQuestionDrawer(question)}>
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p>No matching questions found.</p>
-          )
-        ) : null}
 
         <div id="admin-question-editor" className="admin-editor-anchor">
           {questionUpdateMessage ? <p>{questionUpdateMessage}</p> : null}
