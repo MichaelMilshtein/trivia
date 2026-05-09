@@ -70,6 +70,16 @@ const QUESTION_SORT_FIELDS = {
   active: 'active'
 }
 
+const ADMIN_NAV_ITEMS = [
+  { href: '#admin-overview', label: 'Dashboard / Overview' },
+  { href: '#admin-categories', label: 'Categories' },
+  { href: '#admin-sources', label: 'Sources / Books' },
+  { href: '#admin-question-import', label: 'Question Import' },
+  { href: '#admin-question-editor', label: 'Question Editor' },
+  { href: '#admin-questions-list', label: 'Questions List' },
+  { href: '#admin-question-matrix', label: 'Question Matrix' }
+]
+
 function AdminPage() {
   const [categories, setCategories] = useState([])
   const [sources, setSources] = useState([])
@@ -1023,8 +1033,49 @@ function AdminPage() {
 
   return (
     <section className="admin-page">
-      <h2>Admin</h2>
-      <details className="admin-section" open>
+      <aside className="admin-sidebar" aria-label="Admin section navigation">
+        <div className="admin-sidebar-card">
+          <p className="admin-sidebar-eyebrow">Workspace</p>
+          <h2>Admin</h2>
+          <nav>
+            <ul className="admin-sidebar-list">
+              {ADMIN_NAV_ITEMS.map((item) => (
+                <li key={item.href}>
+                  <a href={item.href}>{item.label}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+      </aside>
+      <div className="admin-content">
+        <section id="admin-overview" className="admin-hero admin-section" aria-labelledby="admin-overview-title">
+          <div>
+            <p className="admin-kicker">Content management</p>
+            <h2 id="admin-overview-title">Dashboard / Overview</h2>
+            <p>Manage books, categories, imports, questions, and coverage from one workspace.</p>
+          </div>
+          <div className="admin-stat-grid" aria-label="Admin content totals">
+            <div className="admin-stat-card">
+              <span>Categories</span>
+              <strong>{categories.length}</strong>
+            </div>
+            <div className="admin-stat-card">
+              <span>Book sources</span>
+              <strong>{sources.length}</strong>
+            </div>
+            <div className="admin-stat-card">
+              <span>Active sources</span>
+              <strong>{sources.filter((source) => source.is_active).length}</strong>
+            </div>
+            <div className="admin-stat-card">
+              <span>Matrix questions</span>
+              <strong>{questionMatrixQuestions.length}</strong>
+            </div>
+          </div>
+        </section>
+
+        <details id="admin-question-import" className="admin-section" open>
         <summary className="admin-section-summary">Question Import</summary>
         <details className="admin-helper-note">
           <summary>JSON v1 helper note</summary>
@@ -1120,7 +1171,7 @@ function AdminPage() {
       </details>
 
 
-      <details className="admin-section" open>
+        <details id="admin-question-matrix" className="admin-section admin-section-wide" open>
         <summary className="admin-section-summary">Question Matrix — Active Questions</summary>
         <p className="admin-row-count">
           Counts include active questions only for active book sources. Columns follow source display order, then title.
@@ -1187,7 +1238,7 @@ function AdminPage() {
           )
         ) : null}
       </details>
-      <details className="admin-section" open>
+        <details id="admin-questions-list" className="admin-section admin-section-wide" open>
         <summary className="admin-section-summary">Questions List</summary>
         {listSourceIdFilter && filteredCategoryQuestions.length > 0 ? (
           <p className="admin-row-count">Rows: {filteredCategoryQuestions.length}</p>
@@ -1315,7 +1366,7 @@ function AdminPage() {
           )
         ) : null}
 
-        <h3>Question editor</h3>
+        <h3 id="admin-question-editor">Question editor</h3>
         {!editingQuestionId ? <p>Click Edit from search results to load a question.</p> : null}
         <form onSubmit={handleUpdateQuestion}>
           <label htmlFor="edit-question-text">Question text</label>
@@ -1448,7 +1499,7 @@ function AdminPage() {
         ) : null}
       </details>
 
-      <details className="admin-section">
+        <details id="admin-sources" className="admin-section">
         <summary className="admin-section-summary">Book Sources</summary>
         <form onSubmit={handleCreateSource}>
           <label htmlFor="source-short-title">Short title</label>
@@ -1686,7 +1737,7 @@ function AdminPage() {
         </form>
       </details>
 
-      <details className="admin-section">
+        <details id="admin-categories" className="admin-section">
         <summary className="admin-section-summary">Categories</summary>
         <form onSubmit={handleCreateCategory}>
           <label htmlFor="category-name">Name</label>
@@ -1796,7 +1847,8 @@ function AdminPage() {
             {isUpdatingCategory ? 'Saving...' : 'Save category changes'}
           </button>
         </form>
-      </details>
+        </details>
+      </div>
     </section>
   )
 }
