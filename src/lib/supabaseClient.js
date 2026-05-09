@@ -38,12 +38,16 @@ function clearStoredAuthSession() {
 }
 
 function getAuthSessionWithExpiry(authResponse) {
-  const expiresAt = authResponse.expires_at || Math.floor(Date.now() / 1000) + authResponse.expires_in
+  const expiresAt = authResponse.expires_at || Math.floor(Date.now() / 1000) + Number(authResponse.expires_in || 0)
 
   return {
     access_token: authResponse.access_token,
     refresh_token: authResponse.refresh_token,
     expires_at: expiresAt,
+    expires_in: authResponse.expires_in,
+    token_type: authResponse.token_type || 'bearer',
+    provider_token: authResponse.provider_token,
+    provider_refresh_token: authResponse.provider_refresh_token,
     user: authResponse.user
   }
 }
@@ -54,6 +58,89 @@ function getSupabaseErrorMessage(errorBody, fallbackMessage) {
     return parsedError.error_description || parsedError.msg || parsedError.message || fallbackMessage
   } catch {
     return errorBody || fallbackMessage
+  }
+}
+
+function getSupabaseConfig() {
+  if (!supabaseUrl || !supabasePublishableKey) {
+    throw new Error('Missing Supabase environment variables.')
+  }
+
+  return { supabaseUrl, supabasePublishableKey }
+}
+
+function getAuthRedirectSessionParams() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  const searchParams = new URLSearchParams(window.location.search)
+  const params = hashParams.has('access_token') ? hashParams : searchParams
+
+  if (params.get('error') || params.get('error_description')) {
+    throw new Error(params.get('error_description') || params.get('error') || 'Unable to sign in with Google.')
+  }
+
+  if (!params.has('access_token')) {
+    return null
+  }
+
+  return params
+}
+
+function removeAuthRedirectParamsFromUrl() {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`)
+}
+
+async function getUser(accessToken) {
+  const { supabaseUrl: url, supabasePublishableKey: key } = getSupabaseConfig()
+
+  const response = await fetch(`${url}/auth/v1/user`, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    throw new Error(getSupabaseErrorMessage(errorBody, 'Unable to load signed-in user.'))
+  }
+
+  return response.json()
+}
+
+async function getSessionFromRedirect() {
+  const params = getAuthRedirectSessionParams()
+
+  if (!params) {
+    return null
+  }
+
+  try {
+    const accessToken = params.get('access_token')
+    const session = getAuthSessionWithExpiry({
+      access_token: accessToken,
+      refresh_token: params.get('refresh_token'),
+      expires_at: Number(params.get('expires_at')) || undefined,
+      expires_in: Number(params.get('expires_in')) || 3600,
+      token_type: params.get('token_type') || 'bearer',
+      provider_token: params.get('provider_token'),
+      provider_refresh_token: params.get('provider_refresh_token'),
+      user: await getUser(accessToken)
+    })
+
+    storeAuthSession(session)
+
+    return session
+  } finally {
+    removeAuthRedirectParamsFromUrl()
   }
 }
 
@@ -81,8 +168,35 @@ async function requestSupabaseAuthToken(body, grantType) {
   return session
 }
 
-export async function signInWithPassword(email, password) {
-  return requestSupabaseAuthToken({ email, password }, 'password')
+async function signInWithOAuth({ provider, options = {} }) {
+  const { supabaseUrl: url } = getSupabaseConfig()
+  const redirectTo = options.redirectTo || (typeof window !== 'undefined' ? window.location.href : undefined)
+  const authorizeUrl = new URL(`${url}/auth/v1/authorize`)
+
+  authorizeUrl.searchParams.set('provider', provider)
+
+  if (redirectTo) {
+    authorizeUrl.searchParams.set('redirect_to', redirectTo)
+  }
+
+  if (typeof window !== 'undefined') {
+    window.location.assign(authorizeUrl.toString())
+  }
+
+  return { data: { provider, url: authorizeUrl.toString() }, error: null }
+}
+
+async function getSession() {
+  const session = await getCurrentAuthSession()
+  return { data: { session }, error: null }
+}
+
+export const supabase = {
+  auth: {
+    signInWithOAuth,
+    getSession,
+    signOut
+  }
 }
 
 export async function refreshAuthSession() {
@@ -96,6 +210,12 @@ export async function refreshAuthSession() {
 }
 
 export async function getCurrentAuthSession() {
+  const redirectSession = await getSessionFromRedirect()
+
+  if (redirectSession) {
+    return redirectSession
+  }
+
   const currentSession = getStoredAuthSession()
 
   if (!currentSession?.access_token) {
@@ -135,14 +255,6 @@ export async function signOut() {
   } finally {
     clearStoredAuthSession()
   }
-}
-
-function getSupabaseConfig() {
-  if (!supabaseUrl || !supabasePublishableKey) {
-    throw new Error('Missing Supabase environment variables.')
-  }
-
-  return { supabaseUrl, supabasePublishableKey }
 }
 
 export async function selectFrom(table, { columns = '*', filters = {} } = {}) {
@@ -191,7 +303,6 @@ export async function insertInto(table, values) {
 
   return response.json()
 }
-
 
 export async function updateRows(table, values, filters = {}) {
   const { supabaseUrl: url, supabasePublishableKey: key } = getSupabaseConfig()
