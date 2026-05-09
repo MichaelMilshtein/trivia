@@ -7,7 +7,7 @@ import {
   updateRows
 } from '../lib/supabaseClient'
 
-const ALLOWED_ADMIN_EMAILS = ['admin@example.com']
+const ALLOWED_ADMIN_EMAILS = ['admin@example.com', 'michael.milshtein@gmail.com']
 
 const QUESTION_COLUMNS =
   'id,question_text,choice_a,choice_b,choice_c,choice_d,correct_index,question_type,difficulty,is_active,source_id,category_id,section'
