@@ -18,22 +18,24 @@ function NavBar() {
         ) : null}
         <h1>{isAdminPage ? 'Trivia Sandbox' : 'Nostalgic Decades Trivia'}</h1>
       </div>
-      <nav aria-label="Primary navigation">
-        <ul className="nav-list">
-          {navItems.map((item) => (
-            <li key={item.path}>
-              <NavLink
-                to={item.path}
-                className={({ isActive }) =>
-                  isActive ? 'nav-link nav-link-active' : 'nav-link'
-                }
-              >
-                {item.label}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      {navItems.length ? (
+        <nav aria-label="Primary navigation">
+          <ul className="nav-list">
+            {navItems.map((item) => (
+              <li key={item.path}>
+                <NavLink
+                  to={item.path}
+                  className={({ isActive }) =>
+                    isActive ? 'nav-link nav-link-active' : 'nav-link'
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ) : null}
     </header>
   )
 }
