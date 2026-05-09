@@ -78,6 +78,15 @@ const QUESTION_SORT_FIELDS = {
   active: 'active'
 }
 
+
+function getAdminErrorMessage(err, fallbackMessage) {
+  return err instanceof Error ? err.message : fallbackMessage
+}
+
+function formatAdminError(actionLabel, err, fallbackMessage) {
+  return `${actionLabel}: ${getAdminErrorMessage(err, fallbackMessage)}`
+}
+
 const ADMIN_NAV_ITEMS = [
   { id: 'admin-overview', href: '#admin-overview', label: 'Dashboard / Overview', icon: '▦' },
   { id: 'admin-sources', href: '#admin-sources', label: 'Book Sources', icon: '▤' },
@@ -97,7 +106,8 @@ function AdminPage() {
   const [categories, setCategories] = useState([])
   const [sources, setSources] = useState([])
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [categoryLoadError, setCategoryLoadError] = useState('')
+  const [sourceLoadError, setSourceLoadError] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [isActive, setIsActive] = useState(true)
@@ -547,24 +557,42 @@ function AdminPage() {
   }
 
   async function loadCategories() {
-    setError('')
+    setCategoryLoadError('')
 
-    const rows = await selectFrom('categories', {
-      columns: 'id,name,description,is_active'
-    })
+    try {
+      const rows = await selectFrom('categories', {
+        columns: 'id,name,description,is_active'
+      })
 
-    setCategories(rows)
+      setCategories(rows)
+      return rows
+    } catch (err) {
+      setCategoryLoadError(
+        formatAdminError('Category list loading failed', err, 'Failed to load categories.')
+      )
+      return []
+    }
   }
 
   async function loadSources() {
-    const rows = await selectFrom('sources', {
-      columns:
-        'id,short_title,full_title,front_cover_image_url,back_cover_image_url,description,store_url,author,display_order,is_active'
-    })
+    setSourceLoadError('')
 
-    const sortedRows = [...rows].sort(compareSourcesByDisplayOrderThenTitle)
+    try {
+      const rows = await selectFrom('sources', {
+        columns:
+          'id,short_title,full_title,front_cover_image_url,back_cover_image_url,description,store_url,author,display_order,is_active'
+      })
 
-    setSources(sortedRows)
+      const sortedRows = [...rows].sort(compareSourcesByDisplayOrderThenTitle)
+
+      setSources(sortedRows)
+      return sortedRows
+    } catch (err) {
+      setSourceLoadError(
+        formatAdminError('Book/source list loading failed', err, 'Failed to load book sources.')
+      )
+      return []
+    }
   }
 
   async function loadQuestionMatrixQuestions() {
@@ -595,7 +623,7 @@ function AdminPage() {
       setQuestionMatrixQuestions(activeQuestionRows)
     } catch (err) {
       setQuestionMatrixError(
-        err instanceof Error ? err.message : 'Failed to load question matrix.'
+        formatAdminError('Question matrix loading failed', err, 'Failed to load question matrix.')
       )
     } finally {
       setIsLoadingQuestionMatrix(false)
@@ -626,8 +654,18 @@ function AdminPage() {
   }
 
   async function refreshCategoryQuestions() {
-    const rows = await fetchCategoryQuestions()
-    setCategoryQuestions(rows)
+    setQuestionsError('')
+
+    try {
+      const rows = await fetchCategoryQuestions()
+      setCategoryQuestions(rows)
+      return rows
+    } catch (err) {
+      setQuestionsError(
+        formatAdminError('Question list loading failed', err, 'Failed to load questions.')
+      )
+      return []
+    }
   }
 
   function resetQuestionEditForm() {
@@ -815,12 +853,6 @@ function AdminPage() {
     async function initializeCategories() {
       try {
         await Promise.all([loadCategories(), loadSources(), loadQuestionMatrixQuestions()])
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Failed to load categories and sources.'
-        )
       } finally {
         setIsLoading(false)
       }
@@ -841,10 +873,7 @@ function AdminPage() {
       setQuestionsError('')
 
       try {
-        const rows = await fetchCategoryQuestions()
-        setCategoryQuestions(rows)
-      } catch (err) {
-        setQuestionsError(err instanceof Error ? err.message : 'Failed to load questions.')
+        await refreshCategoryQuestions()
       } finally {
         setIsLoadingQuestions(false)
       }
@@ -904,7 +933,7 @@ function AdminPage() {
       setIsActive(true)
       await loadCategories()
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to create category.')
+      setSubmitError(formatAdminError('Category create failed', err, 'Failed to create category.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -942,7 +971,7 @@ function AdminPage() {
       setCategoryDrawerMode('')
       await loadCategories()
     } catch (err) {
-      setCategoryUpdateError(err instanceof Error ? err.message : 'Failed to update category.')
+      setCategoryUpdateError(formatAdminError('Category update failed', err, 'Failed to update category.'))
     } finally {
       setIsUpdatingCategory(false)
     }
@@ -1061,7 +1090,7 @@ function AdminPage() {
       if (err instanceof SyntaxError) {
         setImportError('Invalid JSON. Please paste valid JSON and try again.')
       } else {
-        setImportError(err instanceof Error ? err.message : 'Failed to import questions.')
+        setImportError(formatAdminError('Question import failed', err, 'Failed to import questions.'))
       }
     } finally {
       setIsImporting(false)
@@ -1109,7 +1138,7 @@ function AdminPage() {
       await refreshCategoryQuestions()
       await loadQuestionMatrixQuestions()
     } catch (err) {
-      setQuestionUpdateError(err instanceof Error ? err.message : 'Failed to create question.')
+      setQuestionUpdateError(formatAdminError('Question create failed', err, 'Failed to create question.'))
     } finally {
       setIsUpdatingQuestion(false)
     }
@@ -1164,7 +1193,7 @@ function AdminPage() {
       await refreshCategoryQuestions()
       await loadQuestionMatrixQuestions()
     } catch (err) {
-      setQuestionUpdateError(err instanceof Error ? err.message : 'Failed to update question.')
+      setQuestionUpdateError(formatAdminError('Question update failed', err, 'Failed to update question.'))
     } finally {
       setIsUpdatingQuestion(false)
     }
@@ -1207,7 +1236,7 @@ function AdminPage() {
       setSourceIsActive(true)
       await loadSources()
     } catch (err) {
-      setSourceSubmitError(err instanceof Error ? err.message : 'Failed to create source.')
+      setSourceSubmitError(formatAdminError('Book/source create failed', err, 'Failed to create source.'))
     } finally {
       setIsSubmittingSource(false)
     }
@@ -1253,7 +1282,7 @@ function AdminPage() {
       setSourceDrawerMode('')
       await loadSources()
     } catch (err) {
-      setSourceUpdateError(err instanceof Error ? err.message : 'Failed to update source.')
+      setSourceUpdateError(formatAdminError('Book/source update failed', err, 'Failed to update source.'))
     } finally {
       setIsUpdatingSource(false)
     }
@@ -1280,7 +1309,7 @@ function AdminPage() {
       await loadQuestionMatrixQuestions()
     } catch (err) {
       setQuestionActiveError(
-        err instanceof Error ? err.message : 'Failed to update question active status.'
+        formatAdminError('Question active status update failed', err, 'Failed to update question active status.')
       )
     } finally {
       setIsTogglingQuestionActive(false)
@@ -1478,7 +1507,7 @@ function AdminPage() {
           Counts include active questions only for active book sources. Columns follow source display order, then title.
         </p>
         {isLoadingQuestionMatrix ? <p>Loading question matrix...</p> : null}
-        {questionMatrixError ? <p>{questionMatrixError}</p> : null}
+        {questionMatrixError ? <p className="admin-section-message admin-section-message-error" role="alert">{questionMatrixError}</p> : null}
         {!isLoadingQuestionMatrix && !questionMatrixError ? (
           questionMatrix.activeSources.length > 0 ? (
             questionMatrix.rows.length > 0 ? (
@@ -1559,11 +1588,12 @@ function AdminPage() {
 
 
         {sourceSubmitMessage ? <p>{sourceSubmitMessage}</p> : null}
-        {sourceSubmitError ? <p>{sourceSubmitError}</p> : null}
+        {sourceSubmitError ? <p className="admin-section-message admin-section-message-error" role="alert">{sourceSubmitError}</p> : null}
         {sourceUpdateMessage ? <p>{sourceUpdateMessage}</p> : null}
-        {sourceUpdateError ? <p>{sourceUpdateError}</p> : null}
+        {sourceUpdateError ? <p className="admin-section-message admin-section-message-error" role="alert">{sourceUpdateError}</p> : null}
         {isLoading ? <p>Loading sources...</p> : null}
-        {!isLoading && !error ? (
+        {sourceLoadError ? <p className="admin-section-message admin-section-message-error" role="alert">{sourceLoadError}</p> : null}
+        {!isLoading && !sourceLoadError ? (
           sources.length > 0 ? (
             <>
               <p className="admin-row-count">Rows: {sources.length}</p>
@@ -1635,13 +1665,13 @@ function AdminPage() {
 
 
         {submitMessage ? <p>{submitMessage}</p> : null}
-        {submitError ? <p>{submitError}</p> : null}
+        {submitError ? <p className="admin-section-message admin-section-message-error" role="alert">{submitError}</p> : null}
         {categoryUpdateMessage ? <p>{categoryUpdateMessage}</p> : null}
-        {categoryUpdateError ? <p>{categoryUpdateError}</p> : null}
+        {categoryUpdateError ? <p className="admin-section-message admin-section-message-error" role="alert">{categoryUpdateError}</p> : null}
         {isLoading ? <p>Loading categories...</p> : null}
-        {error ? <p>{error}</p> : null}
+        {categoryLoadError ? <p className="admin-section-message admin-section-message-error" role="alert">{categoryLoadError}</p> : null}
 
-        {!isLoading && !error ? (
+        {!isLoading && !categoryLoadError ? (
           categories.length > 0 ? (
             <>
               <p className="admin-row-count">Rows: {categories.length}</p>
@@ -1778,7 +1808,7 @@ function AdminPage() {
         </form>
 
         {importMessage ? <p>{importMessage}</p> : null}
-        {importError ? <p>{importError}</p> : null}
+        {importError ? <p className="admin-section-message admin-section-message-error" role="alert">{importError}</p> : null}
       </details>
 
 
@@ -1809,13 +1839,13 @@ function AdminPage() {
         ) : null}
 
         {isLoadingQuestions ? <p>Loading questions...</p> : null}
-        {questionsError ? <p>{questionsError}</p> : null}
+        {questionsError ? <p className="admin-section-message admin-section-message-error" role="alert">{questionsError}</p> : null}
         {questionActiveMessage ? <p>{questionActiveMessage}</p> : null}
-        {questionActiveError ? <p>{questionActiveError}</p> : null}
+        {questionActiveError ? <p className="admin-section-message admin-section-message-error" role="alert">{questionActiveError}</p> : null}
 
         <div id="admin-question-editor" className="admin-editor-anchor">
           {questionUpdateMessage ? <p>{questionUpdateMessage}</p> : null}
-          {questionUpdateError ? <p>{questionUpdateError}</p> : null}
+          {questionUpdateError ? <p className="admin-section-message admin-section-message-error" role="alert">{questionUpdateError}</p> : null}
         </div>
 
         {!isLoadingQuestions && !questionsError ? (
@@ -2029,10 +2059,10 @@ function AdminPage() {
               onSubmit={categoryDrawerMode === 'edit' ? handleUpdateCategory : handleCreateCategory}
             >
               {categoryDrawerMode === 'edit' && categoryUpdateError ? (
-                <p className="admin-drawer-message">{categoryUpdateError}</p>
+                <p className="admin-drawer-message" role="alert">{categoryUpdateError}</p>
               ) : null}
               {categoryDrawerMode === 'new' && submitError ? (
-                <p className="admin-drawer-message">{submitError}</p>
+                <p className="admin-drawer-message" role="alert">{submitError}</p>
               ) : null}
               <label htmlFor={categoryDrawerMode === 'edit' ? 'edit-category-name' : 'category-name'}>Name</label>
               <input
@@ -2111,10 +2141,10 @@ function AdminPage() {
               onSubmit={sourceDrawerMode === 'edit' ? handleUpdateSource : handleCreateSource}
             >
               {sourceDrawerMode === 'edit' && sourceUpdateError ? (
-                <p className="admin-drawer-message">{sourceUpdateError}</p>
+                <p className="admin-drawer-message" role="alert">{sourceUpdateError}</p>
               ) : null}
               {sourceDrawerMode === 'new' && sourceSubmitError ? (
-                <p className="admin-drawer-message">{sourceSubmitError}</p>
+                <p className="admin-drawer-message" role="alert">{sourceSubmitError}</p>
               ) : null}
               <label htmlFor={sourceDrawerMode === 'edit' ? 'edit-source-short-title' : 'source-short-title'}>Short title</label>
               <input id={sourceDrawerMode === 'edit' ? 'edit-source-short-title' : 'source-short-title'} name={sourceDrawerMode === 'edit' ? 'edit_short_title' : 'short_title'} type="text" value={sourceDrawerMode === 'edit' ? editSourceShortTitle : sourceShortTitle} onChange={(event) => sourceDrawerMode === 'edit' ? setEditSourceShortTitle(event.target.value) : setSourceShortTitle(event.target.value)} required />
@@ -2177,7 +2207,7 @@ function AdminPage() {
               className="admin-drawer-form"
               onSubmit={questionDrawerMode === 'edit' ? handleUpdateQuestion : handleCreateQuestion}
             >
-              {questionUpdateError ? <p className="admin-drawer-message">{questionUpdateError}</p> : null}
+              {questionUpdateError ? <p className="admin-drawer-message" role="alert">{questionUpdateError}</p> : null}
               <label htmlFor="edit-question-text">Question text</label>
               <textarea id="edit-question-text" name="question_text" value={editQuestionText} onChange={(event) => setEditQuestionText(event.target.value)} required />
               <label htmlFor="edit-choice-a">Choice A</label>
