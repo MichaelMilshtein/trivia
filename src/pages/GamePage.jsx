@@ -29,6 +29,29 @@ const SHOW_CORRECT_ANSWER_DEBUG = true
 const CHOICE_KEYS = ['A', 'B', 'C', 'D']
 const GAME_QUESTIONS_PAGE_SIZE = 1000
 const LENNY_AVATAR_IMAGE_URL = '/images/brand/lenny-lenski-avatar01.png'
+
+const GAME_UI_SOUND_PATTERNS = {
+  select: [
+    { frequency: 392, duration: 0.08, gain: 0.018 },
+    { frequency: 493.88, startOffset: 0.045, duration: 0.1, gain: 0.014 }
+  ],
+  continue: [
+    { frequency: 440, duration: 0.08, gain: 0.018 },
+    { frequency: 587.33, startOffset: 0.06, duration: 0.12, gain: 0.016 }
+  ],
+  back: [
+    { frequency: 349.23, duration: 0.1, gain: 0.016 },
+    { frequency: 261.63, startOffset: 0.055, duration: 0.11, gain: 0.014 }
+  ],
+  next: [
+    { frequency: 493.88, duration: 0.07, gain: 0.015 },
+    { frequency: 659.25, startOffset: 0.05, duration: 0.09, gain: 0.012 }
+  ],
+  external: [
+    { frequency: 523.25, duration: 0.08, gain: 0.014 },
+    { frequency: 783.99, startOffset: 0.055, duration: 0.13, gain: 0.012 }
+  ]
+}
 const DEFAULT_BOOK_DETAILS = {
   title: 'Welcome to Nostalgic Decades Trivia',
   body:
@@ -567,6 +590,46 @@ function GamePage() {
     return gameAudioContextRef.current
   }
 
+  function resumeGameAudioContext(audioContext) {
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().catch(() => {})
+    }
+  }
+
+  function playGameUiSound(soundName = 'select') {
+    const audioContext = getGameAudioContext()
+
+    if (!audioContext) {
+      return
+    }
+
+    try {
+      resumeGameAudioContext(audioContext)
+
+      const startTime = audioContext.currentTime
+      const tones = GAME_UI_SOUND_PATTERNS[soundName] || GAME_UI_SOUND_PATTERNS.select
+
+      tones.forEach(({ frequency, startOffset = 0, duration = 0.08, gain = 0.014, type = 'sine' }) => {
+        const toneStartTime = startTime + startOffset
+        const toneEndTime = toneStartTime + duration
+        const oscillator = audioContext.createOscillator()
+        const toneGain = audioContext.createGain()
+
+        oscillator.type = type
+        oscillator.frequency.setValueAtTime(frequency, toneStartTime)
+        toneGain.gain.setValueAtTime(0.0001, toneStartTime)
+        toneGain.gain.exponentialRampToValueAtTime(gain, toneStartTime + 0.012)
+        toneGain.gain.exponentialRampToValueAtTime(0.0001, toneEndTime)
+        oscillator.connect(toneGain)
+        toneGain.connect(audioContext.destination)
+        oscillator.start(toneStartTime)
+        oscillator.stop(toneEndTime + 0.02)
+      })
+    } catch {
+      // Browser audio policies can vary; silently skip game sounds if playback is unavailable.
+    }
+  }
+
   function playAnswerFeedbackSound(isCorrect) {
     const audioContext = getGameAudioContext()
 
@@ -575,9 +638,7 @@ function GamePage() {
     }
 
     try {
-      if (audioContext.state === 'suspended') {
-        audioContext.resume().catch(() => {})
-      }
+      resumeGameAudioContext(audioContext)
 
       const startTime = audioContext.currentTime
       const masterGain = audioContext.createGain()
@@ -603,6 +664,8 @@ function GamePage() {
   }
 
   function toggleSelectedSource(sourceId) {
+    playGameUiSound('select')
+
     const sourceIdValue = String(sourceId)
     const isSelected = selectedSourceIds.includes(sourceIdValue)
     const nextSourceIds = isSelected
@@ -623,6 +686,8 @@ function GamePage() {
     if (!selectedSourceIds.length) {
       return
     }
+
+    playGameUiSound('continue')
 
     setSelectedSectionKeys([])
     setSelectedModeId('')
@@ -646,6 +711,8 @@ function GamePage() {
   }
 
   function toggleSelectedSection(sectionKey) {
+    playGameUiSound('select')
+
     setSelectedSectionKeys((currentSectionKeys) =>
       currentSectionKeys.includes(sectionKey)
         ? currentSectionKeys.filter((currentSectionKey) => currentSectionKey !== sectionKey)
@@ -661,6 +728,8 @@ function GamePage() {
       return
     }
 
+    playGameUiSound('continue')
+
     setSelectedModeId('')
     setQuestionQueue([])
     setResults(null)
@@ -668,6 +737,8 @@ function GamePage() {
   }
 
   function handleChooseMode(modeId) {
+    playGameUiSound('select')
+
     setSelectedModeId(modeId)
     setResults(null)
   }
@@ -676,6 +747,8 @@ function GamePage() {
     if (!selectedSourceIds.length || !selectedSectionKeys.length || !selectedModeId || !selectedSectionQuestions.length) {
       return
     }
+
+    playGameUiSound('continue')
 
     setQuestionQueue(shuffleItems(selectedSectionQuestions).map(prepareQuestionForPlay))
     setCurrentQuestionIndex(0)
@@ -729,6 +802,8 @@ function GamePage() {
   }
 
   function moveToNextQuestion() {
+    playGameUiSound(shouldEndAfterFeedback ? 'continue' : 'next')
+
     if (shouldEndAfterFeedback) {
       finishGame()
       return
@@ -741,6 +816,8 @@ function GamePage() {
   }
 
   function chooseAnotherBook() {
+    playGameUiSound('back')
+
     setSelectedSourceIds([])
     setHoveredSourceId('')
     setFocusedBookDetailsSourceId('')
@@ -753,6 +830,8 @@ function GamePage() {
   }
 
   function chooseAnotherSection() {
+    playGameUiSound('back')
+
     setSelectedSectionKeys([])
     setSelectedModeId('')
     setQuestionQueue([])
@@ -782,6 +861,7 @@ function GamePage() {
   }
 
   function playAgain() {
+    playGameUiSound('continue')
     resetGameSetup()
   }
 
@@ -1175,6 +1255,7 @@ function GamePage() {
                     key={source.id}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={() => playGameUiSound('external')}
                   >
                     {bookContent}
                   </a>
@@ -1186,7 +1267,13 @@ function GamePage() {
               })}
             </div>
 
-            <a className="book-promo-visit" href="https://lennylenski.com" target="_blank" rel="noreferrer">
+            <a
+              className="book-promo-visit"
+              href="https://lennylenski.com"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => playGameUiSound('external')}
+            >
               Visit LennyLenski.com
             </a>
           </aside>
