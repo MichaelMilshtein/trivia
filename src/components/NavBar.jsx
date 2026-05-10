@@ -18,24 +18,36 @@ function NavBar() {
         ) : null}
         <h1>{isAdminPage ? 'Trivia Sandbox' : 'Nostalgic Decades Trivia'}</h1>
       </div>
-      {navItems.length ? (
-        <nav aria-label="Primary navigation">
-          <ul className="nav-list">
-            {navItems.map((item) => (
-              <li key={item.path}>
-                <NavLink
-                  to={item.path}
-                  className={({ isActive }) =>
-                    isActive ? 'nav-link nav-link-active' : 'nav-link'
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      ) : null}
+      <div className="site-header-actions">
+        {isGamePage ? (
+          <a
+            className="site-external-link"
+            href="http://www.lennylenski.com"
+            target="_blank"
+            rel="noreferrer"
+          >
+            lennylenski.com
+          </a>
+        ) : null}
+        {navItems.length ? (
+          <nav aria-label="Primary navigation">
+            <ul className="nav-list">
+              {navItems.map((item) => (
+                <li key={item.path}>
+                  <NavLink
+                    to={item.path}
+                    className={({ isActive }) =>
+                      isActive ? 'nav-link nav-link-active' : 'nav-link'
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ) : null}
+      </div>
     </header>
   )
 }

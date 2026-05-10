@@ -50,6 +50,36 @@ body {
   line-height: 1;
 }
 
+.site-header-game .site-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.site-header-game .site-external-link {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(199, 191, 216, 0.38);
+  border-radius: 999px;
+  padding: 0.35rem 0.68rem;
+  color: #c7bfd8;
+  background: rgba(255, 248, 232, 0.04);
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.site-header-game .site-external-link:hover {
+  border-color: rgba(255, 91, 145, 0.62);
+  color: #fff8e8;
+  background: rgba(255, 91, 145, 0.14);
+}
+
 .nav-list {
   list-style: none;
   display: flex;
