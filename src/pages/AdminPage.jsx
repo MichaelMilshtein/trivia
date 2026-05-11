@@ -1560,6 +1560,14 @@ function AdminPage() {
             <p className="admin-kicker">Content management</p>
             <h2 id="admin-overview-title">Dashboard / Overview</h2>
             <p>Manage books, categories, imports, questions, and coverage from one workspace.</p>
+            <a
+              className="admin-guide-link"
+              href="/docs/TRIVIA_PROJECT_GUIDE.md"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Project guide / AI handoff notes
+            </a>
           </div>
           <div className="admin-stat-grid" aria-label="Admin content totals">
             <div className="admin-stat-card">
