@@ -969,15 +969,26 @@ Question List is the last Admin section.
 It includes:
 
 - New question button
+- Fetch button
 - Reset filters button
 - full question table
 - per-column filters under sortable headers
 
 The old upper filter panel was removed.
 
-Question List also had the Supabase 1,000-row cap and was updated to load questions in paginated batches.
+Question List no longer loads all questions automatically when Admin opens. The table starts empty and prompts admins to use a filter or click Fetch to load questions. Changing a per-column filter loads questions from Supabase using the current filters; Fetch reloads the list using the current filters when data was changed outside the Admin UI. Reset filters clears every filter and returns the list to the initial empty state instead of loading all questions.
 
-No-results behavior:
+Question List also had the Supabase 1,000-row cap and was updated to load questions in paginated batches. Filter-triggered loading and the Fetch button continue to use that paginated loading approach.
+
+Initial empty-state behavior:
+
+- table headers and filter row remain visible
+- show empty-state row inside table:
+  ```text
+  Use a filter or click Fetch to load questions.
+  ```
+
+No-results behavior after a fetch/filter returns no matches:
 
 - table headers and filter row remain visible
 - show empty-state row inside table:

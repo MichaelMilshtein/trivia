@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   insertInto,
   selectFrom,
@@ -37,6 +37,17 @@ const QUESTION_MATRIX_SECTION_ORDER = [
 ]
 const UNSECTIONED_QUESTION_LABEL = 'Unsectioned'
 const QUESTION_FETCH_PAGE_SIZE = 1000
+const DEFAULT_QUESTION_COLUMN_FILTERS = {
+  question: '',
+  source: '',
+  section: '',
+  category: '',
+  type: 'all',
+  difficulty: 'all',
+  active: 'all'
+}
+const DEFAULT_QUESTION_TYPE_OPTIONS = ['mc_single']
+const DEFAULT_QUESTION_DIFFICULTY_OPTIONS = ['easy', 'medium', 'hard']
 const QUESTION_MATRIX_SECTION_MAPPINGS = {
   'world events': 'World Events & Economy',
   'globalization & economy': 'World Events & Economy',
@@ -167,15 +178,9 @@ function AdminPage() {
   const [categoryQuestions, setCategoryQuestions] = useState([])
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   const [questionsError, setQuestionsError] = useState('')
-  const [questionColumnFilters, setQuestionColumnFilters] = useState({
-    question: '',
-    source: '',
-    section: '',
-    category: '',
-    type: 'all',
-    difficulty: 'all',
-    active: 'all'
-  })
+  const [hasFetchedQuestionList, setHasFetchedQuestionList] = useState(false)
+  const questionListFetchIdRef = useRef(0)
+  const [questionColumnFilters, setQuestionColumnFilters] = useState(DEFAULT_QUESTION_COLUMN_FILTERS)
   const [editingQuestionId, setEditingQuestionId] = useState('')
   const [editQuestionText, setEditQuestionText] = useState('')
   const [editChoiceA, setEditChoiceA] = useState('')
@@ -351,14 +356,14 @@ function AdminPage() {
   )
 
   const questionTypeOptions = useMemo(() => {
-    const typeValues = new Set(categoryQuestions.map((question) => question.question_type || 'mc_single'))
+    const typeValues = new Set(DEFAULT_QUESTION_TYPE_OPTIONS)
+    categoryQuestions.forEach((question) => typeValues.add(question.question_type || 'mc_single'))
     return [...typeValues].sort((typeA, typeB) => typeA.localeCompare(typeB))
   }, [categoryQuestions])
 
   const questionDifficultyOptions = useMemo(() => {
-    const difficultyValues = new Set(
-      categoryQuestions.map((question) => question.difficulty || 'unknown')
-    )
+    const difficultyValues = new Set(DEFAULT_QUESTION_DIFFICULTY_OPTIONS)
+    categoryQuestions.forEach((question) => difficultyValues.add(question.difficulty || 'unknown'))
     return [...difficultyValues].sort((difficultyA, difficultyB) =>
       difficultyA.localeCompare(difficultyB)
     )
@@ -710,8 +715,45 @@ function AdminPage() {
     }
   }
 
-  async function fetchCategoryQuestions() {
+  function getQuestionSupabaseFilters(filters) {
+    const supabaseFilters = { order: 'id.desc' }
+    const normalizedQuestionFilter = filters.question.trim()
+    const normalizedSectionFilter = filters.section.trim()
+
+    if (normalizedQuestionFilter) {
+      supabaseFilters.question_text = `ilike.*${normalizedQuestionFilter}*`
+    }
+
+    if (filters.source) {
+      supabaseFilters.source_id = `eq.${filters.source}`
+    }
+
+    if (normalizedSectionFilter) {
+      supabaseFilters.section = `ilike.*${normalizedSectionFilter}*`
+    }
+
+    if (filters.category) {
+      supabaseFilters.category_id = `eq.${filters.category}`
+    }
+
+    if (filters.type !== 'all') {
+      supabaseFilters.question_type = `eq.${filters.type}`
+    }
+
+    if (filters.difficulty !== 'all') {
+      supabaseFilters.difficulty = `eq.${filters.difficulty}`
+    }
+
+    if (filters.active !== 'all') {
+      supabaseFilters.is_active = filters.active === 'active' ? 'eq.true' : 'eq.false'
+    }
+
+    return supabaseFilters
+  }
+
+  async function fetchCategoryQuestions(filters = questionColumnFilters) {
     const questionRows = []
+    const supabaseFilters = getQuestionSupabaseFilters(filters)
     let offset = 0
     let hasMoreQuestions = true
 
@@ -719,7 +761,7 @@ function AdminPage() {
       const questionPage = await selectFrom('questions', {
         columns: QUESTION_COLUMNS,
         filters: {
-          order: 'id.desc',
+          ...supabaseFilters,
           limit: String(QUESTION_FETCH_PAGE_SIZE),
           offset: String(offset)
         }
@@ -733,19 +775,45 @@ function AdminPage() {
     return questionRows
   }
 
-  async function refreshCategoryQuestions() {
+  async function loadCategoryQuestions(filters = questionColumnFilters) {
+    const fetchId = questionListFetchIdRef.current + 1
+    questionListFetchIdRef.current = fetchId
+    setHasFetchedQuestionList(true)
+    setIsLoadingQuestions(true)
     setQuestionsError('')
 
     try {
-      const rows = await fetchCategoryQuestions()
-      setCategoryQuestions(rows)
+      const rows = await fetchCategoryQuestions(filters)
+
+      if (questionListFetchIdRef.current === fetchId) {
+        setCategoryQuestions(rows)
+      }
+
       return rows
     } catch (err) {
-      setQuestionsError(
-        formatAdminError('Question list loading failed', err, 'Failed to load questions.')
-      )
+      if (questionListFetchIdRef.current === fetchId) {
+        setQuestionsError(
+          formatAdminError('Question list loading failed', err, 'Failed to load questions.')
+        )
+      }
+      return []
+    } finally {
+      if (questionListFetchIdRef.current === fetchId) {
+        setIsLoadingQuestions(false)
+      }
+    }
+  }
+
+  async function refreshCategoryQuestions(filters = questionColumnFilters) {
+    return loadCategoryQuestions(filters)
+  }
+
+  async function refreshLoadedQuestionList(filters = questionColumnFilters) {
+    if (!hasFetchedQuestionList) {
       return []
     }
+
+    return refreshCategoryQuestions(filters)
   }
 
   function resetQuestionEditForm() {
@@ -872,22 +940,26 @@ function AdminPage() {
   }
 
   function updateQuestionColumnFilter(filterName, filterValue) {
-    setQuestionColumnFilters((currentFilters) => ({
-      ...currentFilters,
+    const nextFilters = {
+      ...questionColumnFilters,
       [filterName]: filterValue
-    }))
+    }
+
+    setQuestionColumnFilters(nextFilters)
+    loadCategoryQuestions(nextFilters)
   }
 
   function resetQuestionListFilters() {
-    setQuestionColumnFilters({
-      question: '',
-      source: '',
-      section: '',
-      category: '',
-      type: 'all',
-      difficulty: 'all',
-      active: 'all'
-    })
+    questionListFetchIdRef.current += 1
+    setQuestionColumnFilters(DEFAULT_QUESTION_COLUMN_FILTERS)
+    setCategoryQuestions([])
+    setHasFetchedQuestionList(false)
+    setIsLoadingQuestions(false)
+    setQuestionsError('')
+  }
+
+  function handleFetchQuestionList() {
+    loadCategoryQuestions(questionColumnFilters)
   }
 
   useEffect(() => {
@@ -944,22 +1016,13 @@ function AdminPage() {
 
   useEffect(() => {
     if (!isAdminAuthorized) {
+      questionListFetchIdRef.current += 1
+      setCategoryQuestions([])
+      setHasFetchedQuestionList(false)
       setIsLoadingQuestions(false)
-      return undefined
-    }
-
-    async function loadQuestionsForCategory() {
-      setIsLoadingQuestions(true)
       setQuestionsError('')
-
-      try {
-        await refreshCategoryQuestions()
-      } finally {
-        setIsLoadingQuestions(false)
-      }
     }
 
-    loadQuestionsForCategory()
     return undefined
   }, [isAdminAuthorized])
 
@@ -1164,7 +1227,7 @@ function AdminPage() {
       setImportMessage(`Imported ${questionRows.length} question(s) successfully.`)
       setQuestionsJson('')
 
-      await refreshCategoryQuestions()
+      await refreshLoadedQuestionList()
       await loadQuestionMatrixQuestions()
     } catch (err) {
       if (err instanceof SyntaxError) {
@@ -1215,7 +1278,7 @@ function AdminPage() {
       setQuestionUpdateMessage('Question created successfully.')
       setQuestionDrawerMode('')
       resetQuestionEditForm()
-      await refreshCategoryQuestions()
+      await refreshLoadedQuestionList()
       await loadQuestionMatrixQuestions()
     } catch (err) {
       setQuestionUpdateError(formatAdminError('Question create failed', err, 'Failed to create question.'))
@@ -1270,7 +1333,7 @@ function AdminPage() {
 
       setQuestionUpdateMessage('Question updated successfully.')
       setQuestionDrawerMode('')
-      await refreshCategoryQuestions()
+      await refreshLoadedQuestionList()
       await loadQuestionMatrixQuestions()
     } catch (err) {
       setQuestionUpdateError(formatAdminError('Question update failed', err, 'Failed to update question.'))
@@ -1385,7 +1448,7 @@ function AdminPage() {
       setQuestionActiveMessage(
         question.is_active ? 'Question deactivated successfully.' : 'Question reactivated successfully.'
       )
-      await refreshCategoryQuestions()
+      await refreshLoadedQuestionList()
       await loadQuestionMatrixQuestions()
     } catch (err) {
       setQuestionActiveError(
@@ -1973,16 +2036,24 @@ function AdminPage() {
         <div className="admin-section-heading-row">
           <div>
             <h3>Questions</h3>
-            <p>Create a new question or edit an existing row without leaving the list.</p>
+            <p>Use a filter or click Fetch to load questions, then create or edit rows without leaving the list.</p>
           </div>
           <div className="admin-heading-actions">
+            <button
+              type="button"
+              className="admin-secondary-button"
+              onClick={handleFetchQuestionList}
+              disabled={isLoadingQuestions}
+            >
+              Fetch
+            </button>
             <button type="button" className="admin-secondary-button" onClick={resetQuestionListFilters}>
               Reset filters
             </button>
             <button type="button" onClick={openNewQuestionDrawer}>New question</button>
           </div>
         </div>
-        {!isLoadingQuestions && !questionsError ? (
+        {hasFetchedQuestionList && !isLoadingQuestions && !questionsError ? (
           <p className="admin-row-count">
             Rows: {filteredCategoryQuestions.length} of {categoryQuestions.length} loaded
           </p>
@@ -1998,7 +2069,7 @@ function AdminPage() {
           {questionUpdateError ? <p className="admin-section-message admin-section-message-error" role="alert">{questionUpdateError}</p> : null}
         </div>
 
-        {!isLoadingQuestions && !questionsError ? (
+        {!questionsError ? (
           <table className="admin-question-table">
               <thead>
                 <tr>
@@ -2152,7 +2223,21 @@ function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredCategoryQuestions.length === 0 ? (
+                {isLoadingQuestions ? (
+                  <tr>
+                    <td className="admin-question-empty-cell" colSpan="8">
+                      Loading questions...
+                    </td>
+                  </tr>
+                ) : null}
+                {!isLoadingQuestions && !hasFetchedQuestionList ? (
+                  <tr>
+                    <td className="admin-question-empty-cell" colSpan="8">
+                      Use a filter or click Fetch to load questions.
+                    </td>
+                  </tr>
+                ) : null}
+                {!isLoadingQuestions && hasFetchedQuestionList && filteredCategoryQuestions.length === 0 ? (
                   <tr>
                     <td className="admin-question-empty-cell" colSpan="8">
                       No questions match the current filters.
