@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { getCoverVariantPath } from '../lib/bookCovers'
 import { selectFrom } from '../lib/supabaseClient'
 
@@ -184,6 +185,14 @@ function shuffleItems(items) {
 
 function getSourceTitle(source) {
   return source?.short_title || source?.full_title || 'Untitled book'
+}
+
+function getSourceSlug(source) {
+  return getSourceTitle(source)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 function getSourceDescription(source) {
@@ -411,6 +420,7 @@ function ChallengeIcon({ type }) {
 }
 
 function GamePage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [sources, setSources] = useState([])
   const [sourceQuestions, setSourceQuestions] = useState([])
   const [categories, setCategories] = useState([])
@@ -436,6 +446,7 @@ function GamePage() {
   const [isLoadingSources, setIsLoadingSources] = useState(true)
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   const [error, setError] = useState('')
+  const hasAppliedDeepLinkRef = useRef(false)
 
   useEffect(() => {
     async function loadSetupData() {
@@ -547,6 +558,31 @@ function GamePage() {
       }, {}),
     [sources]
   )
+
+  useEffect(() => {
+    if (isLoadingSources || hasAppliedDeepLinkRef.current) {
+      return
+    }
+
+    hasAppliedDeepLinkRef.current = true
+
+    const requestedStep = searchParams.get('step')
+    const requestedBookSlug = searchParams.get('book')
+
+    if (requestedStep !== 'section' || !requestedBookSlug) {
+      return
+    }
+
+    const requestedSource = sources.find((source) => getSourceSlug(source) === requestedBookSlug)
+
+    if (!requestedSource) {
+      setError('That book is not currently available. Please choose a book to begin.')
+      setSearchParams({}, { replace: true })
+      return
+    }
+
+    openSectionStepForSources([String(requestedSource.id)])
+  }, [isLoadingSources, searchParams, setSearchParams, sources])
 
   const selectedMode = selectedModeId ? GAME_MODES[selectedModeId] : null
 
@@ -725,13 +761,28 @@ function GamePage() {
     setError('')
   }
 
-  async function continueWithSelectedSources() {
-    if (!selectedSourceIds.length) {
+  function updateSetupUrl(nextStep, sourceIds) {
+    if (nextStep !== 'section' || sourceIds.length !== 1) {
+      setSearchParams({}, { replace: true })
       return
     }
 
-    playGameUiSound('continue')
+    const source = sourcesById[sourceIds[0]]
 
+    if (source) {
+      setSearchParams({ step: 'section', book: getSourceSlug(source) }, { replace: true })
+    }
+  }
+
+  async function openSectionStepForSources(sourceIds) {
+    const activeSourceIds = sourceIds.filter((sourceId) => sourcesById[sourceId]?.is_active)
+
+    if (!activeSourceIds.length) {
+      return
+    }
+
+    setSelectedSourceIds(activeSourceIds)
+    setFocusedBookDetailsSourceId(activeSourceIds.length === 1 ? activeSourceIds[0] : '')
     setSelectedSectionKeys([])
     setSelectedModeId('')
     setQuestionQueue([])
@@ -740,17 +791,27 @@ function GamePage() {
     setIsLoadingQuestions(true)
 
     try {
-      const activeSelectedSourceIds = selectedSourceIds.filter((sourceId) => sourcesById[sourceId]?.is_active)
-      const rows = await fetchActiveQuestionsForSources(activeSelectedSourceIds)
+      const rows = await fetchActiveQuestionsForSources(activeSourceIds)
 
       setSourceQuestions(rows)
       setStep('section')
+      updateSetupUrl('section', activeSourceIds)
     } catch (err) {
       setSourceQuestions([])
       setError(err instanceof Error ? err.message : 'Failed to load questions for the selected books.')
     } finally {
       setIsLoadingQuestions(false)
     }
+  }
+
+  async function continueWithSelectedSources() {
+    if (!selectedSourceIds.length) {
+      return
+    }
+
+    playGameUiSound('continue')
+
+    await openSectionStepForSources(selectedSourceIds)
   }
 
   function toggleSelectedSection(sectionKey) {
@@ -777,6 +838,7 @@ function GamePage() {
     setQuestionQueue([])
     setResults(null)
     setStep('mode')
+    setSearchParams({}, { replace: true })
   }
 
   function handleChooseMode(modeId) {
@@ -870,6 +932,7 @@ function GamePage() {
     setSourceQuestions([])
     setResults(null)
     setStep('book')
+    setSearchParams({}, { replace: true })
   }
 
   function chooseAnotherSection() {
@@ -880,6 +943,7 @@ function GamePage() {
     setQuestionQueue([])
     setResults(null)
     setStep(selectedSourceIds.length ? 'section' : 'book')
+    updateSetupUrl('section', selectedSourceIds)
   }
 
   function resetGameSetup() {
@@ -901,6 +965,7 @@ function GamePage() {
     setResults(null)
     setError('')
     setStep('book')
+    setSearchParams({}, { replace: true })
   }
 
   function playAgain() {
