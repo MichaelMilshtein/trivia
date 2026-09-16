@@ -1,6 +1,6 @@
 # Nostalgic Decades Trivia — AI handoff and project guide
 
-Last updated: 2026-05-10
+Last updated: 2026-09-16
 
 ## Purpose
 
@@ -104,6 +104,24 @@ domains/trivia.lennylenski.com/public_html
 ```
 
 Important: the live site will not change until `npm run build` is run and the updated `dist` output is uploaded.
+
+### Automated deployment via Claude Code (preferred going forward)
+
+Claude Code can deploy to Hostinger directly using the Hostinger MCP tools — no manual FTP or File Manager upload needed.
+
+**Standing preference (Misha, 2026-09-16): delegate Hostinger deployments to Claude Code.** Claude handles the whole build-and-deploy flow and only asks Misha to step in when manual interference is genuinely required (e.g. GitHub authentication, or a decision only Misha can make). Claude still pauses for an explicit go-ahead immediately before the one irreversible step (the upload that overwrites the live site), unless told to proceed without pausing.
+
+Deploy flow Claude follows:
+
+1. Make sure `main` contains the changes (merge any open PR first), then `npm run build`.
+2. Verify the built `dist/` is complete: `index.html`, `.htaccess`, `assets/`, `images/` (including all book covers), `docs/`.
+3. Recommended: preview the built site locally (`npx vite preview`) and confirm it works before uploading.
+4. Pre-release check: `game_settings` debug OFF (so the effective values are sprint 60 / correct answers hidden).
+5. Zip the **contents** of `dist/` (files at the archive root — not the `dist` folder itself), excluding `.DS_Store`.
+6. Deploy with the Hostinger tool `hosting_deployStaticWebsite` for domain `trivia.lennylenski.com`. It uploads and extracts the archive into `public_html`, **overwriting the live site** (irreversible).
+7. Verify: load `https://trivia.lennylenski.com` and confirm the change is live.
+
+Hostinger account details: username `u763333732`, domain `trivia.lennylenski.com`, document root `/home/u763333732/domains/trivia.lennylenski.com/public_html`. The deploy tool resolves the username from the domain automatically. The database (Supabase) is separate and already live — deploying only updates the frontend.
 
 ---
 
@@ -840,6 +858,20 @@ display_order = 5
 
 A typo once used “The Mighty 80s” for 90s. Correct value is `The Mighty 90s`.
 
+### 2000s source data
+
+```text
+short_title = 2000s Trivia
+full_title = 2000s Trivia: The Ultimate Quiz Book
+front_cover_image_url = /images/book-covers/2000s-front.jpg
+back_cover_image_url = /images/book-covers/2000s-back.jpg
+store_url = https://www.amazon.com/dp/B0HJTSKX92
+author = Lenny Lenski
+display_order = 6
+```
+
+Note: this book's `short_title` is “2000s Trivia” (not “The <Adjective> 2000s”), so it intentionally breaks the naming pattern of the first five books. Because the public deep-link slug is derived from the displayed title, changing this title would change its URL slug — see the deep-links handoff.
+
 ---
 
 ## 19. Current question counts
@@ -878,6 +910,23 @@ If the inactive test question is active, add 1.
 ---
 
 ## 20. Major content imports completed
+
+### 2000s — 2000s Trivia (sixth book, added 2026-09-16)
+
+640 questions across 12 book sections, generated from the source Word document and imported into Supabase. This book differs structurally from the first five: 12 evocative section names, and source formats that included True/False and fill-in-the-blank — all converted into standard 4-choice `mc_single` (correct answer first, `correct_index = 0`). The interactive “Bonus Round” personality quizzes were excluded (not 4-choice trivia).
+
+The 12 sections map to the existing 6 public themes (this book has no Food section):
+
+```text
+World Events & Economy   — Welcome to Y2K (40) + The World Was Watching (60) = 100
+Culture & Lifestyle      — Mall Rats & Everyday Life (70) + Fashion Crimes (50) + Talk 2000s to Me (30) = 150
+Entertainment & Media    — The Sounds of the 2000s (70) + Must-See TV (60) + At the Movies & DVD Nights (60) = 190
+Technology & Innovation  — Life Before Smartphones (70) + Press Start: Gaming's Golden Age (50) = 120
+Mixed Bag                — Things We Forgot Existed (50) + That Year in Review (30) = 80
+Total = 640
+```
+
+This brings the all-book active question total to roughly 3,692. Every batch passed a two-agent QA gate before import: (1) factual accuracy + era-correctness (web-verified), and (2) standalone phrasing (no “book-in-hand” / “mentioned in the quiz” references). Mapping was added in BOTH `PUBLIC_SECTION_GROUPS` (GamePage.jsx) and `QUESTION_MATRIX_SECTION_MAPPINGS` (AdminPage.jsx) — see §9. Deployed to Hostinger via Claude Code the same day (see §2, Automated deployment).
 
 ### 90s — The Mighty 90s
 
