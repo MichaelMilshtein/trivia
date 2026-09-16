@@ -440,6 +440,13 @@ When a user selects a public theme, gameplay loads questions from all raw sectio
 
 Admin Question Matrix remains raw-section based but includes a Section Mapping column.
 
+**IMPORTANT — section→theme mapping lives in TWO code locations. When a book introduces new raw section names, update BOTH or something breaks:**
+
+1. `PUBLIC_SECTION_GROUPS` in `src/pages/GamePage.jsx` — drives the public game's theme picker. If a raw section is missing here, that section's questions will NOT appear in the public game.
+2. `QUESTION_MATRIX_SECTION_MAPPINGS` in `src/pages/AdminPage.jsx` — drives the Admin Question Matrix "Section Mapping" column. If a raw section is missing here, it shows as "Unmapped" in Admin (cosmetic only — does not affect the public game).
+
+Keep these two lists in sync. Example: the "2000s Trivia" book added 12 new raw section names (Welcome to Y2K, Life Before Smartphones, etc.), all mapped in both places.
+
 ---
 
 ## 10. Multi-book and multi-section gameplay

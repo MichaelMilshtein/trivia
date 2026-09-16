@@ -59,7 +59,20 @@ const QUESTION_MATRIX_SECTION_MAPPINGS = {
   technology: 'Technology & Innovation',
   'technology & innovation': 'Technology & Innovation',
   'bonus pages': 'Mixed Bag',
-  'decade potpourri': 'Mixed Bag'
+  'decade potpourri': 'Mixed Bag',
+  // 2000s Trivia sections (keep in sync with PUBLIC_SECTION_GROUPS in GamePage.jsx)
+  'welcome to y2k': 'World Events & Economy',
+  'the world was watching': 'World Events & Economy',
+  'mall rats & everyday life': 'Culture & Lifestyle',
+  'fashion crimes': 'Culture & Lifestyle',
+  'talk 2000s to me': 'Culture & Lifestyle',
+  'the sounds of the 2000s': 'Entertainment & Media',
+  'must-see tv': 'Entertainment & Media',
+  'at the movies & dvd nights': 'Entertainment & Media',
+  'life before smartphones': 'Technology & Innovation',
+  "press start: gaming's golden age": 'Technology & Innovation',
+  'things we forgot existed': 'Mixed Bag',
+  'that year in review': 'Mixed Bag'
 }
 
 function getQuestionMatrixSectionMapping(sectionName) {
