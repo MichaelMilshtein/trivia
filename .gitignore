@@ -138,3 +138,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .DS_Store
+
+# local intake for new-book assets (covers, PDFs) - not deployed
+_incoming/
