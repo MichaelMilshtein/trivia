@@ -80,15 +80,15 @@ const SOURCE_PILL_CLASS_NAMES = {
 const PUBLIC_SECTION_GROUPS = [
   {
     name: 'World Events & Economy',
-    rawSections: ['World Events', 'Globalization & Economy']
+    rawSections: ['World Events', 'Globalization & Economy', 'Welcome to Y2K', 'The World Was Watching']
   },
   {
     name: 'Culture & Lifestyle',
-    rawSections: ['Culture', 'Culture & Lifestyle']
+    rawSections: ['Culture', 'Culture & Lifestyle', 'Mall Rats & Everyday Life', 'Fashion Crimes', 'Talk 2000s to Me']
   },
   {
     name: 'Entertainment & Media',
-    rawSections: ['Entertainment', 'Entertainment & Media']
+    rawSections: ['Entertainment', 'Entertainment & Media', 'The Sounds of the 2000s', 'Must-See TV', 'At the Movies & DVD Nights']
   },
   {
     name: 'Food',
@@ -96,11 +96,11 @@ const PUBLIC_SECTION_GROUPS = [
   },
   {
     name: 'Technology & Innovation',
-    rawSections: ['Technology', 'Technology & Innovation']
+    rawSections: ['Technology', 'Technology & Innovation', 'Life Before Smartphones', "Press Start: Gaming's Golden Age"]
   },
   {
     name: 'Mixed Bag',
-    rawSections: ['Bonus Pages', 'Decade Potpourri']
+    rawSections: ['Bonus Pages', 'Decade Potpourri', 'Things We Forgot Existed', 'That Year in Review']
   }
 ]
 const PUBLIC_SECTION_ORDER = PUBLIC_SECTION_GROUPS.map((sectionGroup) => sectionGroup.name)
